@@ -1,19 +1,19 @@
 extern crate crfsuite;
 
-use crfsuite::{Algorithm, Attribute, CrfError, GraphicalModel, Model, Trainer};
+use crfsuite::{Algorithm, Attribute, Error, GraphicalModel, Model, Trainer};
 
 #[test]
 fn test_trainer_default_impl() {
     let mut trainer = Trainer::default();
     let ret = trainer.train("tests/test.crfsuite", 1i32);
-    assert_eq!(ret.err(), Some(CrfError::AlgorithmNotSelected));
+    assert_eq!(ret.err(), Some(Error::AlgorithmNotSelected));
 }
 
 #[test]
 fn test_trainer_train_uninitialized() {
     let mut trainer = Trainer::default();
     let ret = trainer.train("tests/test.crfsuite", 1i32);
-    assert_eq!(ret.err(), Some(CrfError::AlgorithmNotSelected));
+    assert_eq!(ret.err(), Some(Error::AlgorithmNotSelected));
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn test_trainer_train_empty_data() {
         .select(Algorithm::LBFGS, GraphicalModel::CRF1D)
         .unwrap();
     let ret = trainer.train("tests/test.crfsuite", -1i32);
-    assert_eq!(ret.err(), Some(CrfError::EmptyData));
+    assert_eq!(ret.err(), Some(Error::EmptyData));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn test_help_invalid_argument() {
         .unwrap();
     let ret = trainer.help("foo");
     match ret.err().unwrap() {
-        CrfError::ParamNotFound(_) => {}
+        Error::ParamNotFound(_) => {}
         _ => panic!("test fail"),
     }
 }
@@ -146,7 +146,7 @@ fn test_get_invalid_argument() {
         .unwrap();
     let ret = trainer.get("foo");
     match ret.err().unwrap() {
-        CrfError::ParamNotFound(_) => {}
+        Error::ParamNotFound(_) => {}
         _ => panic!("test fail"),
     }
 }
@@ -171,7 +171,7 @@ fn test_set_invalid_argument() {
         .unwrap();
     let ret = trainer.set("foo", "1.0");
     match ret.err().unwrap() {
-        CrfError::ParamNotFound(_) => {}
+        Error::ParamNotFound(_) => {}
         _ => panic!("test fail"),
     }
 }
