@@ -10,47 +10,32 @@ use std::os::unix::io::{IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{IntoRawHandle, RawHandle};
 use std::path::Path;
-use std::{error, fmt, mem, ptr, slice};
+use std::str::FromStr;
+use std::{fmt, mem, ptr, slice};
 
 use crfsuite_sys::*;
 #[cfg(not(windows))]
 use libc::{c_char, c_int, c_uint};
 use libc::{c_void, fclose, fdopen};
+use thiserror::Error;
 
 /// Errors from crfsuite ffi functions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum CrfSuiteError {
-    /// Incompatible data
+    #[error("incompatible data")]
     Incompatible,
-    /// Internal error
+    #[error("internal error")]
     InternalLogic,
-    /// Not implemented
+    #[error("not implemented")]
     NotImplemented,
-    /// Unsupported operation
+    #[error("unsupported operation")]
     NotSupported,
-    /// Insufficient memory
+    #[error("insufficient memory")]
     OutOfMemory,
-    /// Overflow
+    #[error("overflow")]
     Overflow,
-    /// Unknown error occurred
+    #[error("unknown error occurred")]
     Unknown,
-}
-
-impl error::Error for CrfSuiteError {}
-
-impl fmt::Display for CrfSuiteError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let desc = match *self {
-            CrfSuiteError::Incompatible => "Incompatible data",
-            CrfSuiteError::InternalLogic => "Internal error",
-            CrfSuiteError::NotImplemented => "Not implemented",
-            CrfSuiteError::NotSupported => "Unsupported operation",
-            CrfSuiteError::OutOfMemory => "Insufficient memory",
-            CrfSuiteError::Overflow => "Overflow",
-            CrfSuiteError::Unknown => "Unknown error occurred",
-        };
-        write!(f, "{}", desc)
-    }
 }
 
 impl From<libc::c_int> for CrfSuiteError {
@@ -68,50 +53,27 @@ impl From<libc::c_int> for CrfSuiteError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum CrfError {
-    /// Errors from crfsuite ffi functions
-    CrfSuiteError(CrfSuiteError),
-    /// Create instance error
+#[derive(Debug, Error, Clone, PartialEq)]
+pub enum Error {
+    #[error("errors from crfsuite ffi functions")]
+    CrfSuiteError(#[from] CrfSuiteError),
+    #[error("create instance error: `{0}`")]
     CreateInstanceError(String),
-    /// Parameter not found
+    #[error("parameter {0} not found")]
     ParamNotFound(String),
-    /// Trainer algorithm not selected
+    #[error("trainer algorithm not selected, call Trainer::select before Trainer::train.")]
     AlgorithmNotSelected,
-    /// Trainer data is empty
+    #[error("trainer data is empty, call Trainer::append before Trainer::train")]
     EmptyData,
-    /// Invalid argument
+    #[error("invalid argument: `{0}`")]
     InvalidArgument(String),
-    /// Invalid value
+    #[error("invalid value: `{0}`")]
     ValueError(String),
-    /// Invalid model
+    #[error("invalid model: `{0}`")]
     InvalidModel(String),
 }
 
-impl error::Error for CrfError {}
-
-impl fmt::Display for CrfError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            CrfError::CrfSuiteError(ref err) => err.fmt(f),
-            CrfError::ParamNotFound(ref name) => write!(f, "Parameter {} not found", name),
-            CrfError::AlgorithmNotSelected => write!(
-                f,
-                "The trainer is not initialized. Call Trainer::select before Trainer::train."
-            ),
-            CrfError::EmptyData => write!(
-                f,
-                "The data is empty. Call Trainer::append before Trainer::train."
-            ),
-            CrfError::CreateInstanceError(ref err)
-            | CrfError::InvalidArgument(ref err)
-            | CrfError::ValueError(ref err)
-            | CrfError::InvalidModel(ref err) => err.fmt(f),
-        }
-    }
-}
-
-pub type Result<T> = ::std::result::Result<T, CrfError>;
+pub type Result<T> = ::std::result::Result<T, Error>;
 
 /// Tuple of attribute and its value.
 #[derive(Debug, Clone, PartialEq)]
@@ -194,8 +156,8 @@ impl fmt::Display for Algorithm {
     }
 }
 
-impl ::std::str::FromStr for Algorithm {
-    type Err = CrfError;
+impl FromStr for Algorithm {
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
@@ -204,7 +166,7 @@ impl ::std::str::FromStr for Algorithm {
             "ap" | "averaged-perceptron" => Ok(Algorithm::AP),
             "pa" | "passive-aggressive" => Ok(Algorithm::PA),
             "arow" => Ok(Algorithm::AROW),
-            _ => Err(CrfError::InvalidArgument(s.to_string())),
+            _ => Err(Error::InvalidArgument(s.to_string())),
         }
     }
 }
@@ -227,13 +189,13 @@ impl fmt::Display for GraphicalModel {
     }
 }
 
-impl ::std::str::FromStr for GraphicalModel {
-    type Err = CrfError;
+impl FromStr for GraphicalModel {
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "1d" | "crf1d" => Ok(GraphicalModel::CRF1D),
-            _ => Err(CrfError::InvalidArgument(s.to_string())),
+            _ => Err(Error::InvalidArgument(s.to_string())),
         }
     }
 }
@@ -277,7 +239,7 @@ extern "C" fn logging_callback(
             buf.assume_init()
         };
         let message = CStr::from_ptr(buf.as_ptr()).to_str().unwrap();
-        print!("{}", message);
+        log::info!("{}", message);
     }
     0
 }
@@ -308,7 +270,7 @@ impl Trainer {
                 );
                 // ret is c bool
                 if ret == 0 {
-                    return Err(CrfError::CreateInstanceError(
+                    return Err(Error::CreateInstanceError(
                         "Failed to create a dictionary instance for attributes.".to_string(),
                     ));
                 }
@@ -320,7 +282,7 @@ impl Trainer {
                 );
                 // ret is c bool
                 if ret == 0 {
-                    return Err(CrfError::CreateInstanceError(
+                    return Err(Error::CreateInstanceError(
                         "Failed to create a dictionary instance for labels.".to_string(),
                     ));
                 }
@@ -437,7 +399,7 @@ impl Trainer {
             );
             // ret is c bool
             if ret == 0 {
-                return Err(CrfError::CreateInstanceError(
+                return Err(Error::CreateInstanceError(
                     "Failed to create a instance for trainer.".to_string(),
                 ));
             }
@@ -460,11 +422,11 @@ impl Trainer {
     /// -1 meaning "use all instances for training".
     pub fn train(&mut self, model: &str, holdout: i32) -> Result<()> {
         if self.trainer.is_null() {
-            return Err(CrfError::AlgorithmNotSelected);
+            return Err(Error::AlgorithmNotSelected);
         }
         unsafe {
             if (*self.data).attrs.is_null() || (*self.data).labels.is_null() {
-                return Err(CrfError::EmptyData);
+                return Err(Error::EmptyData);
             }
             let model_cstr = CString::new(model).unwrap();
             let ret = (*self.trainer)
@@ -472,7 +434,7 @@ impl Trainer {
                 .map(|f| f(self.trainer, self.data, model_cstr.as_ptr(), holdout))
                 .unwrap();
             if ret != 0 {
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
         }
         Ok(())
@@ -515,7 +477,7 @@ impl Trainer {
                 != 0
             {
                 (*pms).release.map(|f| f(pms)).unwrap();
-                return Err(CrfError::ParamNotFound(name.to_string()));
+                return Err(Error::ParamNotFound(name.to_string()));
             }
             (*pms).release.map(|f| f(pms)).unwrap();
         }
@@ -539,7 +501,7 @@ impl Trainer {
                 != 0
             {
                 (*pms).release.map(|f| f(pms)).unwrap();
-                return Err(CrfError::ParamNotFound(name.to_string()));
+                return Err(Error::ParamNotFound(name.to_string()));
             }
             value = CStr::from_ptr(value_ptr).to_string_lossy().into_owned();
             (*pms).free.map(|f| f(pms, value_ptr)).unwrap();
@@ -566,7 +528,7 @@ impl Trainer {
                 != 0
             {
                 (*pms).release.map(|f| f(pms)).unwrap();
-                return Err(CrfError::ParamNotFound(name.to_string()));
+                return Err(Error::ParamNotFound(name.to_string()));
             }
             value = CStr::from_ptr(value_ptr).to_string_lossy().into_owned();
             (*pms).free.map(|f| f(pms, value_ptr)).unwrap();
@@ -625,7 +587,7 @@ impl Model {
     /// Open a model file
     pub fn from_file(name: &str) -> Result<Self> {
         let mut file = File::open(name)
-            .map_err(|err| CrfError::InvalidModel(format!("Failed to open model: {}", err)))?;
+            .map_err(|err| Error::InvalidModel(format!("Failed to open model: {}", err)))?;
         Self::validate_model(&mut file)?;
         drop(file); // Close file
 
@@ -646,7 +608,7 @@ impl Model {
                 &mut instance,
             );
             if ret != 0 {
-                return Err(CrfError::CreateInstanceError(
+                return Err(Error::CreateInstanceError(
                     "Failed to create a model instance.".to_string(),
                 ));
             }
@@ -662,20 +624,20 @@ impl Model {
         // Check that file magic is correct
         let mut magic = [0; 4];
         reader.read_exact(&mut magic).map_err(|err| {
-            CrfError::InvalidModel(format!("Failed to read model file magic: {}", err))
+            Error::InvalidModel(format!("Failed to read model file magic: {}", err))
         })?;
         if &magic != b"lCRF" {
-            return Err(CrfError::InvalidModel(
+            return Err(Error::InvalidModel(
                 "Invalid model file magic".to_string(),
             ));
         }
         // Make sure crfsuite won't read past allocated memory in case of incomplete header
         let pos = reader
             .seek(SeekFrom::End(0))
-            .map_err(|err| CrfError::InvalidModel(format!("Invalid model: {}", err)))?;
+            .map_err(|err| Error::InvalidModel(format!("Invalid model: {}", err)))?;
         if pos <= 48 {
             // header size
-            return Err(CrfError::InvalidModel(
+            return Err(Error::InvalidModel(
                 "Invalid model file header".to_string(),
             ));
         }
@@ -691,7 +653,7 @@ impl Model {
                 &mut self.0 as *mut *mut _ as *mut *mut _,
             );
             if ret != 0 {
-                return Err(CrfError::CreateInstanceError(
+                return Err(Error::CreateInstanceError(
                     "Failed to create a model instance.".to_string(),
                 ));
             }
@@ -716,7 +678,7 @@ impl Model {
                 .map(|f| f(self.0, &mut tagger))
                 .unwrap();
             if ret != 0 {
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             Ok(Tagger {
                 model: self,
@@ -741,7 +703,7 @@ impl Model {
             }
             let ret = (*self.0).dump.map(|f| f(self.0, file)).unwrap();
             if ret != 0 {
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             fclose(file);
         }
@@ -768,7 +730,7 @@ impl Model {
             }
             let ret = (*self.0).dump.map(|f| f(self.0, file)).unwrap();
             if ret != 0 {
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             fclose(file);
         }
@@ -803,7 +765,7 @@ impl Model {
         let mut attrs: *mut crfsuite_dictionary_t = ptr::null_mut();
         let ret = (*self.0).get_attrs.map(|f| f(self.0, &mut attrs)).unwrap();
         if ret != 0 {
-            return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+            return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
         }
         Ok(attrs)
     }
@@ -815,7 +777,7 @@ impl Model {
             .map(|f| f(self.0, &mut labels))
             .unwrap();
         if ret != 0 {
-            return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+            return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
         }
         Ok(labels)
     }
@@ -853,7 +815,7 @@ impl<'a> Tagger<'a> {
                     .unwrap();
                 if ret != 0 {
                     (*labels).release.map(|f| f(labels)).unwrap();
-                    return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                    return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
                 }
                 lseq.push(CStr::from_ptr(label).to_string_lossy().into_owned());
                 (*labels).free.map(|f| f(labels, label)).unwrap();
@@ -909,7 +871,7 @@ impl<'a> Tagger<'a> {
                 .unwrap();
             if ret != 0 {
                 (*attrs).release.map(|f| f(attrs)).unwrap();
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             crfsuite_instance_finish(&mut instance);
             (*attrs).release.map(|f| f(attrs)).unwrap();
@@ -935,7 +897,7 @@ impl<'a> Tagger<'a> {
                 .unwrap();
             if ret != 0 {
                 (*labels).release.map(|f| f(labels)).unwrap();
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             paths.set_len(length as usize);
             let mut yseq = Vec::with_capacity(length as usize);
@@ -948,7 +910,7 @@ impl<'a> Tagger<'a> {
                     .unwrap();
                 if ret != 0 {
                     (*labels).release.map(|f| f(labels)).unwrap();
-                    return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                    return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
                 }
                 yseq.push(CStr::from_ptr(label).to_string_lossy().into_owned());
                 (*labels).free.map(|f| f(labels, label)).unwrap();
@@ -969,7 +931,7 @@ impl<'a> Tagger<'a> {
             }
             // Make sure |y| == |x|
             if length != yseq.len() {
-                return Err(CrfError::InvalidArgument(format!(
+                return Err(Error::InvalidArgument(format!(
                     "The numbers of items and labels differ: |x| = {}, |y| = {}",
                     length,
                     yseq.len()
@@ -984,7 +946,7 @@ impl<'a> Tagger<'a> {
                 let l = (*labels).to_id.map(|f| f(labels, y_cstr.as_ptr())).unwrap();
                 if l < 0 {
                     (*labels).release.map(|f| f(labels)).unwrap();
-                    return Err(CrfError::ValueError(format!(
+                    return Err(Error::ValueError(format!(
                         "Failed to convert into label identifier: {}",
                         y.as_ref()
                     )));
@@ -998,7 +960,7 @@ impl<'a> Tagger<'a> {
                 .unwrap();
             if ret != 0 {
                 (*labels).release.map(|f| f(labels)).unwrap();
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             // Compute the partition factor.
             let mut lognorm: floatval_t = 0.0;
@@ -1008,7 +970,7 @@ impl<'a> Tagger<'a> {
                 .unwrap();
             (*labels).release.map(|f| f(labels)).unwrap();
             if ret != 0 {
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             Ok((score - lognorm).exp())
         }
@@ -1025,7 +987,7 @@ impl<'a> Tagger<'a> {
             }
             // Make sure that 0 <= position < |x|.
             if position < 0 || length <= position as usize {
-                return Err(CrfError::InvalidArgument(format!(
+                return Err(Error::InvalidArgument(format!(
                     "The position {} is out of range of {}",
                     position, length
                 )));
@@ -1037,7 +999,7 @@ impl<'a> Tagger<'a> {
             let l = (*labels).to_id.map(|f| f(labels, y_cstr.as_ptr())).unwrap();
             if l < 0 {
                 (*labels).release.map(|f| f(labels)).unwrap();
-                return Err(CrfError::ValueError(format!(
+                return Err(Error::ValueError(format!(
                     "Failed to convert into label identifier: {}",
                     label
                 )));
@@ -1049,7 +1011,7 @@ impl<'a> Tagger<'a> {
                 .unwrap();
             (*labels).release.map(|f| f(labels)).unwrap();
             if ret != 0 {
-                return Err(CrfError::CrfSuiteError(CrfSuiteError::from(ret)));
+                return Err(Error::CrfSuiteError(CrfSuiteError::from(ret)));
             }
             Ok(prob)
         }
