@@ -298,29 +298,27 @@ impl Trainer {
     }
 
     /// Remove all instances in the data set
-    pub fn clear(&mut self) -> Result<()> {
-        if self.data.is_null() {
-            return Ok(());
-        }
-        unsafe {
-            if !(*self.data).attrs.is_null() {
-                (*(*self.data).attrs)
-                    .release
-                    .map(|release| release((*self.data).attrs))
-                    .unwrap();
-                (*self.data).attrs = ptr::null_mut();
+    pub fn clear(&mut self) {
+        if !self.data.is_null() {
+            unsafe {
+                if !(*self.data).attrs.is_null() {
+                    (*(*self.data).attrs)
+                        .release
+                        .map(|release| release((*self.data).attrs))
+                        .unwrap();
+                    (*self.data).attrs = ptr::null_mut();
+                }
+                if !(*self.data).labels.is_null() {
+                    (*(*self.data).labels)
+                        .release
+                        .map(|release| release((*self.data).labels))
+                        .unwrap();
+                    (*self.data).labels = ptr::null_mut();
+                }
+                crfsuite_data_finish(self.data);
+                crfsuite_data_init(self.data);
             }
-            if !(*self.data).labels.is_null() {
-                (*(*self.data).labels)
-                    .release
-                    .map(|release| release((*self.data).labels))
-                    .unwrap();
-                (*self.data).labels = ptr::null_mut();
-            }
-            crfsuite_data_finish(self.data);
-            crfsuite_data_init(self.data);
         }
-        Ok(())
     }
 
     /// Append an instance (item/label sequence) to the data set.
@@ -556,7 +554,7 @@ impl Drop for Trainer {
     fn drop(&mut self) {
         unsafe {
             if !self.data.is_null() {
-                self.clear().unwrap();
+                self.clear();
                 libc::free(self.data as *mut _);
                 self.data = ptr::null_mut();
             }
