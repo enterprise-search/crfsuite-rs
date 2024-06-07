@@ -18,6 +18,8 @@ use crfsuite_sys::*;
 use libc::{c_char, c_int, c_uint};
 use libc::{c_void, fclose, fdopen};
 use thiserror::Error;
+mod evaluation;
+pub use evaluation::Performance;
 
 /// Errors from crfsuite ffi functions
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -263,7 +265,7 @@ impl Trainer {
     fn init(&mut self) -> Result<()> {
         unsafe {
             let interface = CString::new("dictionary").unwrap();
-            if (*self.data).labels.is_null() {
+            if (*self.data).attrs.is_null() {
                 let ret = crfsuite_create_instance(
                     interface.as_ptr() as *const _,
                     &mut (*self.data).attrs as *mut *mut _ as *mut *mut _,
