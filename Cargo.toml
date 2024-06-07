@@ -28,3 +28,12 @@ members = [
 
 [dev-dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
+criterion = "0.5.1"
+
+[[bench]]
+name = "train_benchmark"
+harness = false
+
+[[bench]]
+name = "predict_benchmark"
+harness = false
