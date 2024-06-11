@@ -5,8 +5,8 @@ use crate::quark::Quark;
 pub type Float = f64;
 
 pub struct Attr {
-    aid: usize,
-    value: Float,
+    pub aid: usize,
+    pub value: Float,
 }
 
 impl Attr {
@@ -18,7 +18,7 @@ impl Attr {
 pub type Item = Vec<Attr>;
 
 pub struct Instance {
-    items: Vec<Item>,
+    pub items: Vec<Item>,
     labels: Vec<usize>,
     weight: Float,
     group: usize,

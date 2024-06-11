@@ -28,30 +28,6 @@ impl Display for Measure {
         write!(f, "{}/{}", self.n_match, self.n_total)
     }
 }
-pub struct Evaluation {
-    total_item: usize,
-    matched_item: usize,
-
-    total_sequence: usize,
-    matched_sequence: usize,
-
-    macro_precision: f64,
-    macro_recall: f64,
-    macro_fmeasure: f64,
-}
-
-impl Evaluation {
-    pub fn accumulate(&mut self, expected: &[String], actual: &[String]) {
-        let n_match = expected.iter().zip(actual).filter(|(a, b)| a == b).count();
-        self.total_item += expected.len();
-        self.matched_item += n_match;
-        if n_match == expected.len() {
-            self.matched_sequence += 1;
-        }
-    }
-}
-
-
 
 /// Label-wise performance values.
 #[derive(Debug, Default)]
@@ -104,6 +80,12 @@ pub struct Performance {
     macro_fmeasure: f64,
 }
 
+#[derive(Debug)]
+pub struct Estimation {
+    pub precision: f64,
+    pub recall: f64,
+}
+
 impl Performance {
     pub fn accumulate(&mut self, reference: &[String], prediction: &[String]) {
         let mut matched = 0;
@@ -123,7 +105,7 @@ impl Performance {
         self.inst_total_num += 1;
     }
 
-    pub fn evaluate(&mut self) {
+    pub fn evaluate(&mut self) -> Estimation {
         for (label, lev) in &mut self.tbl {
             if lev.num_observation == 0 {
                 continue;
@@ -160,6 +142,7 @@ impl Performance {
         if self.inst_total_num > 0 {
             self.inst_accuracy = self.inst_total_correct as f64 / self.inst_total_num as f64;
         }
+        Estimation { precision: self.macro_precision, recall: self.macro_recall }
     }
 }
 

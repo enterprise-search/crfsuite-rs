@@ -1,15 +1,30 @@
-use std::{collections::HashMap, ffi::{c_char, CString}, ptr::null};
+use std::collections::HashMap;
 
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Quark {
     v: Vec<String>,
     m: HashMap<String, usize>,
+}
+
+impl From<Vec<(u32, String)>> for Quark {
+    fn from(value: Vec<(u32, String)>) -> Self {
+        let mut this = Self::default();
+        for (i, s) in value {
+            let p = s.as_str();
+            this.v.push(s.clone());
+            this.m.insert(s, i as usize);
+        }
+        this
+    }
 }
 
 impl Quark {
     pub fn new(v: &[(String)]) -> Self {
         Self { v: v.to_vec(), m: v.iter().enumerate().map(|(i,s)| (s.to_string(), i)).collect() }
     }
+
     pub fn find_by_id(&self, id: usize) -> Option<String> {
         if self.v.len() > id {
             return Some(self.v[id].to_string());
@@ -29,6 +44,10 @@ impl Quark {
         self.m.insert(key.to_string(), idx);
         self.v.push(key.to_string());
         idx
+    }
+
+    pub fn len(&self) -> usize {
+        self.v.len()
     }
 }
 

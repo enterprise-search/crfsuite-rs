@@ -1,9 +1,13 @@
 use std::{collections::HashMap, convert::TryInto, path::PathBuf};
 
 use cqdb::CQDB;
+use serde::{Deserialize, Serialize};
 
-use crate::{crf::model::Model, quark::Quark};
+use crate::{crf::{model::Model, tagger::Tagger}, quark::Quark};
 
+use super::tagger::Crf1dTagger;
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FeatRefs {
     pub fids: Vec<usize>,
     pub num_features: usize,
@@ -20,7 +24,7 @@ impl FeatRefs {
 #[derive(Debug)]
 pub enum FeatCat {}
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Feature {
     pub cat: usize,
     pub src: usize,
@@ -28,6 +32,7 @@ pub struct Feature {
     pub weight: f64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Crf1dModel {
     buffer: Vec<u8>,
     attr_refs: Vec<FeatRefs>,
@@ -98,11 +103,11 @@ impl Crf1dModel {
             let offset = off_label_refs + CHUNK_SIZE + 4 * i;
             let offset =
                 u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
-            let n = u32::from_le_bytes(buffer[offset + 4..offset + 8].try_into().unwrap()) as usize;
+            let n = u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
             let v = (0..n)
                 .map(|j| {
                     u32::from_le_bytes(
-                        buffer[offset + 8 + 4 * j..offset + 8 + 4 * j + 4]
+                        buffer[offset + 4 + 4 * j..offset + 4 + 4 * j + 4]
                             .try_into()
                             .unwrap(),
                     ) as usize
@@ -121,11 +126,11 @@ impl Crf1dModel {
             let offset = off_attr_refs + CHUNK_SIZE + 4 * i;
             let offset =
                 u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
-            let n = u32::from_le_bytes(buffer[offset + 4..offset + 8].try_into().unwrap()) as usize;
+            let n = u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
             let v = (0..n)
                 .map(|j| {
                     u32::from_le_bytes(
-                        buffer[offset + 8 + 4 * j..offset + 8 + 4 * j + 4]
+                        buffer[offset + 4 + 4 * j..offset + 4 + 4 * j + 4]
                             .try_into()
                             .unwrap(),
                     ) as usize
@@ -151,17 +156,17 @@ impl Crf1dModel {
             attr_refs,
             label_refs,
             features: features,
-            labels: Quark::default(),
-            attrs: Quark::default(),
+            labels: labels.into(),
+            attrs: attrs.into(),
         }
     }
 
     pub fn num_labels(&self) -> usize {
-        todo!()
+        self.labels.len()
     }
 
     pub fn num_attrs(&self) -> usize {
-        todo!()
+        self.attrs.len()
     }
 
     pub(crate) fn crf1dm_get_labelref(&self, lid: usize) -> &FeatRefs {
@@ -182,16 +187,16 @@ impl Crf1dModel {
 }
 
 impl Model for Crf1dModel {
-    fn get_tagger(&self) -> crate::Tagger {
-        todo!()
+    fn get_tagger(&self) -> Crf1dTagger {
+        Crf1dTagger::new(self)
     }
 
-    fn get_labels(&self) -> crate::quark::Quark {
-        todo!()
+    fn get_labels(&self) -> &Quark {
+        &self.labels
     }
 
-    fn get_attrs(&self) -> crate::quark::Quark {
-        todo!()
+    fn get_attrs(&self) -> &Quark {
+        &self.attrs
     }
 
     fn dump(&self, path: std::path::PathBuf) {
@@ -207,5 +212,7 @@ mod tests {
     fn read_buf() {
         let path = "ner";
         let model = Crf1dModel::from_path(path.into());
+        let s = serde_json::to_string(&model).expect("failed to serialize");
+        // println!("{}", s);
     }
 }
