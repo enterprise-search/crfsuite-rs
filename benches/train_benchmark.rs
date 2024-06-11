@@ -62,7 +62,7 @@ fn train(fpath: &Path) {
 }
 
 fn train_benchmark(c: &mut Criterion) {
-    let fpath = Path::new("train.data");
+    let fpath = Path::new("test.data");
     c.bench_function("train", |b| b.iter(|| train(black_box(&fpath))));
 }
 
