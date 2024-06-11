@@ -1,9 +1,9 @@
-use std::{collections::HashMap, convert::TryInto, path::PathBuf};
+use std::{convert::TryInto, fs::File, path::PathBuf};
 
 use cqdb::CQDB;
 use serde::{Deserialize, Serialize};
 
-use crate::{crf::{model::Model, tagger::Tagger}, quark::Quark};
+use crate::{crf::model::Model, quark::Quark};
 
 use super::tagger::Crf1dTagger;
 
@@ -33,7 +33,24 @@ pub struct Feature {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct Header {
+    magic: [u8; 4],     /* File magic. */
+    size: usize,          /* File size. */
+    typ: [u8; 4],       /* Model type */
+    version: usize,       /* Version number. */
+    num_features: usize,  /* Number of features. */
+    num_labels: usize,    /* Number of labels. */
+    num_attrs: usize,     /* Number of attributes. */
+    off_features: usize,  /* Offset to features. */
+    off_labels: usize,    /* Offset to label CQDB. */
+    off_attrs: usize,     /* Offset to attribute CQDB. */
+    off_labelrefs: usize, /* Offset to label feature references. */
+    off_attrrefs: usize,  /* Offset to attribute feature references. */
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Crf1dModel {
+    header: Header,
     buffer: Vec<u8>,
     attr_refs: Vec<FeatRefs>,
     label_refs: Vec<FeatRefs>,
@@ -63,7 +80,21 @@ impl Crf1dModel {
         let off_attrs = v[5];
         let off_label_refs = v[6];
         let off_attr_refs = v[7];
-        println!("sz: {size}, n_feats: {:?}, num_labels: {:?}, n_attrs: {:?} off_feats: {off_feats}, o_l: {off_labels}, o_a: {off_attrs}, o_l_r: {off_label_refs}, o_a_r: {off_attr_refs}", n_feats, n_labels, n_attrs);
+
+        let header = Header {
+            magic: [0; 4],
+            size: size,
+            typ: [1;4],
+            version: 1,
+            num_features: n_feats,
+            num_labels: n_labels,
+            num_attrs: n_attrs,
+            off_features: off_feats,
+            off_labels: off_labels,
+            off_attrs: off_attrs,
+            off_labelrefs: off_label_refs,
+            off_attrrefs: off_attr_refs,
+        };
 
         const CHUNK_SIZE: usize = 12;
         const FEATURE_SIZE: usize = 20;
@@ -158,6 +189,7 @@ impl Crf1dModel {
             features: features,
             labels: labels.into(),
             attrs: attrs.into(),
+            header,
         }
     }
 
@@ -200,7 +232,8 @@ impl Model for Crf1dModel {
     }
 
     fn dump(&self, path: std::path::PathBuf) {
-        todo!()
+        let w = File::create(path).expect("failed to create file");
+        serde_json::to_writer(w, self).expect("failed to write");
     }
 }
 
@@ -212,7 +245,18 @@ mod tests {
     fn read_buf() {
         let path = "ner";
         let model = Crf1dModel::from_path(path.into());
-        let s = serde_json::to_string(&model).expect("failed to serialize");
-        // println!("{}", s);
+        let header = &model.header;
+        assert_eq!(137415, header.num_features);
+        assert_eq!(9, header.num_labels);
+        assert_eq!(22033, header.num_attrs);
+
+        assert_eq!(48, header.off_features);
+        assert_eq!(583440, header.off_labels);
+        assert_eq!(585816, header.off_attrs);
+        assert_eq!(1624284, header.off_labelrefs);
+        assert_eq!(1624700, header.off_attrrefs);
+
+        assert_eq!(header.num_attrs, model.num_attrs());
+        assert_eq!(header.num_labels, model.num_labels())
     }
 }

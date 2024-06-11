@@ -131,6 +131,7 @@ impl Crf1dContext {
             this.mexp_trans.resize(L * L, 0.0);
         }
         this.crf1dc_set_num_items(T);
+        this.num_items = 0;
         this
     }
 
@@ -140,17 +141,37 @@ impl Crf1dContext {
         if self.cap_items < T {
             self.alpha_score.resize(T * L, 0.0);
             self.beta_score.resize(T * L, 0.0);
+            for i in 0..T*L {
+                self.alpha_score[i] = 0.0;
+                self.beta_score[i] = 0.0;
+            }
             self.scale_factor.resize(T, 0.0);
+            for i in 0..T {
+                self.scale_factor[i] = 0.0;
+            }
             self.row.resize(L, 0.0);
+            for i in 0..L {
+                self.row[i] = 0.0;
+            }
 
             if self.flag.contains(&Opt::CTXF_VITERBI) {
                 self.backward_edge.resize(T * L, 0);
+                for i in 0..T*L {
+                    self.backward_edge[i] = 0;
+                }
             }
 
             self.state.resize(T * L, 0.0);
+            for i in 0..T*L {
+                self.state[i] = 0.0;
+            }
             if self.flag.contains(&Opt::CTXF_MARGINALS) {
                 self.exp_state.resize(T * L, 0.0);
                 self.mexp_state.resize(T * L, 0.0);
+                for i in 0..T*L {
+                    self.exp_state[i] = 0.0;
+                    self.mexp_state[i] = 0.0;
+                }
             }
 
             self.cap_items = T;
@@ -185,7 +206,7 @@ impl Crf1dContext {
 
     pub fn crf1dc_exp_transition(&mut self) {
         let L = self.num_labels;
-        for i in 0..L {
+        for i in 0..L*L {
             self.exp_trans[i] = self.trans[i].exp();
         }
     }
@@ -217,7 +238,7 @@ impl Crf1dContext {
                     }
                 }
                 /* Backward link (#t, #j) -> (#t-1, #i). */
-                if (argmax_score >= 0) {
+                if argmax_score >= 0 {
                     (((self.backward_edge)[(self.num_labels) * (t) + (j)])) = argmax_score;
                 }
                 /* Add the state score on (t, j). */

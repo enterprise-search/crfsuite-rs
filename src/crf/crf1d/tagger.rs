@@ -1,10 +1,10 @@
 use crate::crf::{data::Instance, tagger::Tagger};
 
+use super::context::Crf1dContext;
 use super::{
     context::{self, ResetOpt},
     model::Crf1dModel,
 };
-use super::context::Crf1dContext;
 
 #[derive(Debug)]
 enum Level {
@@ -23,7 +23,11 @@ pub struct Crf1dTagger<'a> {
 impl<'a> Crf1dTagger<'a> {
     pub fn new(model: &'a Crf1dModel) -> Self {
         let L = model.num_labels();
-        let mut ctx = Crf1dContext::new(&[context::Opt::CTXF_VITERBI, context::Opt::CTXF_MARGINALS], L, 0);
+        let mut ctx = Crf1dContext::new(
+            &[context::Opt::CTXF_VITERBI, context::Opt::CTXF_MARGINALS],
+            L,
+            0,
+        );
         ctx.reset(&[context::ResetOpt::RF_TRANS]);
         {
             /* Compute transition scores between two labels. */
@@ -44,7 +48,7 @@ impl<'a> Crf1dTagger<'a> {
             num_labels: L,
             num_attrs: model.num_attrs(),
             level: Level::LEVEL_NONE,
-        };        
+        };
         this.level = Level::LEVEL_NONE;
         this
     }
@@ -57,10 +61,9 @@ impl<'a> Crf1dTagger<'a> {
 impl<'a> Tagger for Crf1dTagger<'a> {
     fn set_instance(&mut self, instance: &Instance) {
         let T = instance.len();
-        let L = self.model.num_labels();
         self.ctx.crf1dc_set_num_items(T);
         self.ctx.reset(&[ResetOpt::RF_STATE]);
-  
+
         /* Loop over the items in the sequence. */
         for (i, item) in instance.items.iter().enumerate() {
             /* Loop over the contents (attributes) attached to the item. */
@@ -73,8 +76,8 @@ impl<'a> Tagger for Crf1dTagger<'a> {
                     /* The state feature #(attr->fids[r]), which is represented by
                     the attribute #a, outputs the label #(f->dst). */
                     let fid = self.model.crf1dm_get_featureid(attr_ref, k);
-                    let f = self.model.crf1dm_get_feature(fid);                    
-                    self.ctx.state[self.ctx.num_labels*i+f.dst] += f.weight * value;
+                    let f = self.model.crf1dm_get_feature(fid);
+                    self.ctx.state[self.ctx.num_labels * i + f.dst] += f.weight * value;
                 }
             }
         }

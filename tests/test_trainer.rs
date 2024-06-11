@@ -63,7 +63,7 @@ fn test_clear_empty() {
     trainer
         .select(Algorithm::LBFGS, GraphicalModel::CRF1D)
         .unwrap();
-    trainer.clear().unwrap();
+    trainer.clear();
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_clear_not_empty() {
         .select(Algorithm::LBFGS, GraphicalModel::CRF1D)
         .unwrap();
     trainer.append(&xseq, &yseq, 0i32).unwrap();
-    trainer.clear().unwrap();
+    trainer.clear();
 }
 
 #[test]

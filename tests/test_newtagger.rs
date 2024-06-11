@@ -54,7 +54,8 @@ fn tag() {
                 let mut prediction = Vec::new();
                 prediction.resize(instance.len(), 0);
                 let score = tagger.viterbi(&mut prediction); //.expect("failed to tag");
-                                                             // println!("output: {:?}", prediction);
+                println!("score = {score}, {:?}, \nrefs: {:?}, \npred: {:?}", labels, instance.labels, prediction);
+                // println!("output: {:?}", prediction);
                 let prediction = prediction
                     .iter()
                     .map(|i| m_labels.find_by_id(*i).unwrap_or("N/A".into()))
