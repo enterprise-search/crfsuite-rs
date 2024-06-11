@@ -257,6 +257,11 @@ mod tests {
         assert_eq!(1624700, header.off_attrrefs);
 
         assert_eq!(header.num_attrs, model.num_attrs());
-        assert_eq!(header.num_labels, model.num_labels())
+        assert_eq!(header.num_labels, model.num_labels());
+
+        assert_eq!(29169, model.features.len());
+
+        assert_eq!(header.num_attrs, model.attr_refs.len());
+        assert_eq!(header.num_labels, model.label_refs.len());
     }
 }
