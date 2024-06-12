@@ -231,7 +231,11 @@ impl Model for Crf1dModel {
         &self.attrs
     }
 
-    fn dump(&self, path: std::path::PathBuf) {
+    fn load(path: PathBuf) -> Self {
+        Self::from_path(path)
+    }
+
+    fn save(&self, path: std::path::PathBuf) {
         let w = File::create(path).expect("failed to create file");
         serde_json::to_writer(w, self).expect("failed to write");
     }
