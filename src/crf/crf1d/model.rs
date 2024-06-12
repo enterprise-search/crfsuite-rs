@@ -216,6 +216,33 @@ impl Crf1dModel {
     pub(crate) fn crf1dm_get_feature(&self, fid: usize) -> &Feature {
         &self.features[fid]
     }
+
+    fn dump(&self) {
+        println!("TRANSITIONS:");
+        for i in 0..self.num_labels() {
+            let refs = self.crf1dm_get_labelref(i);
+            for j in 0..refs.num_features {
+                let fid = self.crf1dm_get_featureid(refs, j);
+                let f = self.crf1dm_get_feature(fid);
+                let from = self.labels.find_by_id(f.src).unwrap_or("NULL".to_string());
+                let to = self.labels.find_by_id(f.dst).unwrap_or("NULL".to_string());
+                println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
+            }
+        }
+        /* Dump the transition features. */
+        println!("STATE_FEATURES:");
+        for i in 0..self.num_attrs() {
+            let refs = self.crf1dm_get_attrref(i);
+            for j in 0..refs.num_features {
+                let fid = self.crf1dm_get_featureid(refs, j);
+                let f = self.crf1dm_get_feature(fid);
+                assert!(f.src == i, "WARNING: an inconsistent attribute reference.");
+                let from = self.attrs.find_by_id(f.src).unwrap_or("NULL".to_string());
+                let to = self.labels.find_by_id(f.dst).unwrap_or("NULL".to_string());
+                println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
+            }
+        }
+    }
 }
 
 impl Model for Crf1dModel {
@@ -246,7 +273,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_buf() {
+    fn load() {
         let path = "ner";
         let model = Crf1dModel::from_path(path.into());
         let header = &model.header;
@@ -267,5 +294,12 @@ mod tests {
 
         assert_eq!(header.num_attrs, model.attr_refs.len());
         assert_eq!(header.num_labels, model.label_refs.len());
+    }
+
+    #[test]
+    fn dump() {
+        let path = "ner";
+        let model = Crf1dModel::from_path(path.into());
+        model.dump();
     }
 }
