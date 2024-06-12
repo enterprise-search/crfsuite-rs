@@ -141,7 +141,7 @@ impl Crf1dContext {
         if self.cap_items < T {
             self.alpha_score.resize(T * L, 0.0);
             self.beta_score.resize(T * L, 0.0);
-            for i in 0..T*L {
+            for i in 0..T * L {
                 self.alpha_score[i] = 0.0;
                 self.beta_score[i] = 0.0;
             }
@@ -156,19 +156,19 @@ impl Crf1dContext {
 
             if self.flag.contains(&Opt::CTXF_VITERBI) {
                 self.backward_edge.resize(T * L, 0);
-                for i in 0..T*L {
+                for i in 0..T * L {
                     self.backward_edge[i] = 0;
                 }
             }
 
             self.state.resize(T * L, 0.0);
-            for i in 0..T*L {
+            for i in 0..T * L {
                 self.state[i] = 0.0;
             }
             if self.flag.contains(&Opt::CTXF_MARGINALS) {
                 self.exp_state.resize(T * L, 0.0);
                 self.mexp_state.resize(T * L, 0.0);
-                for i in 0..T*L {
+                for i in 0..T * L {
                     self.exp_state[i] = 0.0;
                     self.mexp_state[i] = 0.0;
                 }
@@ -181,23 +181,23 @@ impl Crf1dContext {
     pub(crate) fn reset(&mut self, opts: &[ResetOpt]) {
         let T = self.num_items;
         let L = self.num_labels;
-    
+
         if opts.contains(&ResetOpt::RF_STATE) {
             for i in 0..self.state.len() {
                 self.state[i] = 0.0;
             }
         }
         if opts.contains(&ResetOpt::RF_TRANS) {
-            for i in 0..L*L {
+            for i in 0..L * L {
                 self.trans[i] = 0.0;
             }
         }
 
         if self.flag.contains(&Opt::CTXF_MARGINALS) {
-            for i in 0..T*L {
+            for i in 0..T * L {
                 self.mexp_state[i] = 0.0;
             }
-            for i in 0..L*L {
+            for i in 0..L * L {
                 self.mexp_trans[i] = 0.0;
             }
             self.log_norm = 0.0;
@@ -206,21 +206,20 @@ impl Crf1dContext {
 
     pub fn crf1dc_exp_transition(&mut self) {
         let L = self.num_labels;
-        for i in 0..L*L {
+        for i in 0..L * L {
             self.exp_trans[i] = self.trans[i].exp();
         }
     }
-    
+
     pub(crate) fn viterbi(&mut self, labels: &mut Vec<usize>) -> f64 {
         let T = self.num_items;
         let L = self.num_labels;
-    
+
         /* This function assumes state and trans scores to be in the logarithm domain. */
         /* Compute the scores at (0, *). */
         for j in 0..L {
-            self.alpha_score[self.num_labels*0 + j] = self.state[self.num_labels*0 + j];
+            self.alpha_score[self.num_labels * 0 + j] = self.state[self.num_labels * 0 + j];
         }
-    
         /* Compute the scores at (t, *). */
         for t in 1..T {
             /* Compute the score of (t, j). */
@@ -229,7 +228,8 @@ impl Crf1dContext {
                 let mut argmax_score = -1;
                 for i in 0..L {
                     /* Transit from (t-1, i) to (t, j). */
-                    let score = (((self.alpha_score)[(self.num_labels) * (t - 1) + (i)])) + (((self.trans)[(self.num_labels) * (i) + (j)]));
+                    let score = ((self.alpha_score)[(self.num_labels) * (t - 1) + (i)])
+                        + ((self.trans)[(self.num_labels) * (i) + (j)]);
 
                     /* Store this path if it has the maximum score. */
                     if max_score < score {
@@ -239,31 +239,30 @@ impl Crf1dContext {
                 }
                 /* Backward link (#t, #j) -> (#t-1, #i). */
                 if argmax_score >= 0 {
-                    (((self.backward_edge)[(self.num_labels) * (t) + (j)])) = argmax_score;
+                    self.backward_edge[self.num_labels * (t) + j] = argmax_score;
                 }
                 /* Add the state score on (t, j). */
-                (((self.alpha_score)[(self.num_labels) * (t) + (j)])) = max_score + (((self.state)[(self.num_labels) * (t) + (j)]));
+                self.alpha_score[self.num_labels * (t) + j] =
+                    max_score + self.state[self.num_labels * (t) + j];
             }
         }
-       
 
         /* Find the node (#T, #i) that reaches EOS with the maximum score. */
         let mut max_score = f64::MIN;
         /* Set a score for T-1 to be overwritten later. Just in case we don't
         end up with something beating -FLOAT_MAX. */
-        labels[T-1] = 0;
+        labels[T - 1] = 0;
         for i in 0..L {
             let prev = self.alpha_score[(self.num_labels) * (T - 1) + (i)];
             if max_score < prev {
                 max_score = prev;
-                labels[T-1] = i;        /* Tag the item #T. */
+                labels[T - 1] = i; /* Tag the item #T. */
             }
         }
-
         /* Tag labels by tracing the backward links. */
-        for t in (0..T-1).rev() {
-            let i = labels[t+1];
-            labels[t] = self.backward_edge[(self.num_labels) * (t + 1) + (i)] as usize;
+        for t in (0..T - 1).rev() {
+            let i = labels[t + 1];
+            labels[t] = self.backward_edge[(self.num_labels) * (t + 1) + i] as usize;
         }
 
         /* Return the maximum score (without the normalization factor subtracted). */

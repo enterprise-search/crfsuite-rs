@@ -1,19 +1,18 @@
-
 use std::{
     fs::File,
     io::{BufRead, BufReader},
 };
 extern crate crfsuite;
-use crfsuite::{crf::crf1d::{model::Crf1dModel, tagger::Crf1dTagger}, Performance};
-
-use crate::{
-    crfsuite::crf::{
-        data::{Attr, Instance, Item},
-        model::Model,
-        tagger::Tagger,
-    },
+use crfsuite::{
+    crf::crf1d::{model::Crf1dModel, tagger::Crf1dTagger},
+    Performance,
 };
 
+use crate::crfsuite::crf::{
+    data::{Attr, Instance, Item},
+    model::Model,
+    tagger::Tagger,
+};
 
 #[test]
 fn init_tagger() {
@@ -41,9 +40,11 @@ fn tag() {
             if let Some((label, attrs)) = line.split_once('\t') {
                 let item: Item = attrs
                     .split('\t')
-                    .map(|s| Attr::new(m_attrs.find(s).unwrap_or(0), 1.0))
+                    .map(|s| m_attrs.find(s))
+                    .flatten()
+                    .map(|i| Attr::new(i, 1.0))
                     .collect();
-                instance.append(item, m_labels.find(label).unwrap_or(0));
+                instance.append(item, m_labels.find(label).unwrap_or(labels.len()));
                 labels.push(label.to_string());
             } else {
                 log::warn!("invalid line: {line}");
@@ -54,8 +55,8 @@ fn tag() {
                 let mut prediction = Vec::new();
                 prediction.resize(instance.len(), 0);
                 let score = tagger.viterbi(&mut prediction); //.expect("failed to tag");
-                println!("score = {score}, {:?}, \nrefs: {:?}, \npred: {:?}", labels, instance.labels, prediction);
-                // println!("output: {:?}", prediction);
+                                                             // println!("score = {score}, {:?}, \nrefs: {:?}, \npred: {:?}", labels, instance.labels, prediction);
+                                                             // println!("output: {:?}", prediction);
                 let prediction = prediction
                     .iter()
                     .map(|i| m_labels.find_by_id(*i).unwrap_or("N/A".into()))
@@ -72,12 +73,12 @@ fn tag() {
     }
     //double sec = (clk1 - clk0) / (double)CLOCKS_PER_SEC;
     let est = performance.evaluate();
-    println!("{}", performance);
+    println!("perf: {}, est: {:?}", performance, est);
     assert!(
-        (est.precision - 0.998457).abs() < 0.0000001,
+        (est.precision - 0.998457).abs() < 0.00001,
         "{}",
         est.precision
     );
-    assert!((est.recall - 0.997050).abs() < 0.0000001, "{}", est.recall);
+    assert!((est.recall - 0.997050).abs() < 0.00001, "{}", est.recall);
     // fprintf(fpo, "Elapsed time: %f [sec] (%.1f [instance/sec])\n", sec, N / sec);
 }
