@@ -19,8 +19,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 fn predict(tagger: &mut dyn Tagger, dataset: &Vec<Instance>) {
     for sequence in dataset {
         tagger.set_instance(sequence);
-        let mut prediction = Vec::new();
-        prediction.resize(sequence.len(), 0);
+        let mut prediction = vec![0; sequence.len()];
         let score = tagger.viterbi(&mut prediction);
 
         let mut n = 0;

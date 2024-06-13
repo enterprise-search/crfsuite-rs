@@ -211,7 +211,7 @@ impl Crf1dContext {
         }
     }
 
-    pub(crate) fn viterbi(&mut self, labels: &mut Vec<usize>) -> f64 {
+    pub(crate) fn viterbi(&mut self, labels: &mut [usize]) -> f64 {
         let T = self.num_items;
         let L = self.num_labels;
 
