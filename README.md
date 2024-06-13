@@ -45,6 +45,12 @@ if __name__ == '__main__':
 RUST_LOG=info cargo run --example train -- -p c1=0.1 -p c2=0.1 -p max_iterations=100 -p feature.possible_transitions=1 -m ner train.data -v -v
 ```
 
+### Benchmark
+
+```shell
+cargo bench --bench predict_benchmark
+```
+
 ## License
 
 This work is released under the MIT license. A copy of the license is provided in the [LICENSE](./LICENSE) file.

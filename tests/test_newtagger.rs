@@ -5,7 +5,7 @@ use std::{
 extern crate crfsuite;
 use crfsuite::{
     crf::crf1d::{model::Crf1dModel, tagger::Crf1dTagger},
-    Performance,
+    Dataset, Performance,
 };
 
 use crate::crfsuite::crf::{
