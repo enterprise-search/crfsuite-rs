@@ -17,14 +17,15 @@ use crfsuite::crf::{
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn predict(tagger: &mut dyn Tagger, dataset: &Vec<Instance>) {
+    let mut prediction = Vec::with_capacity(100);
     for sequence in dataset {
         tagger.set_instance(sequence);
-        let mut prediction = vec![0; sequence.len()];
+        prediction.resize(sequence.len(), 0);
         let score = tagger.viterbi(&mut prediction);
 
         let mut n = 0;
-        for (label, pred) in zip(&sequence.labels, prediction) {
-            if *label != pred {
+        for (label, pred) in zip(&sequence.labels, &prediction) {
+            if *label != *pred {
                 n += 1;
             }
         }
