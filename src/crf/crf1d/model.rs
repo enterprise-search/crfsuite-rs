@@ -7,19 +7,7 @@ use crate::{crf::model::Model, quark::Quark};
 
 use super::tagger::Crf1dTagger;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FeatRefs {
-    pub fids: Vec<usize>,
-    pub num_features: usize,
-}
-impl FeatRefs {
-    pub fn new(n: usize, v: Vec<usize>) -> Self {
-        Self {
-            fids: v,
-            num_features: n,
-        }
-    }
-}
+type FeatRefs = Vec<usize>;
 
 #[derive(Debug)]
 pub enum FeatCat {}
@@ -135,7 +123,7 @@ impl Crf1dModel {
             let offset =
                 u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
             let n = u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
-            let v = (0..n)
+            let v: FeatRefs = (0..n)
                 .map(|j| {
                     u32::from_le_bytes(
                         buffer[offset + 4 + 4 * j..offset + 4 + 4 * j + 4]
@@ -143,8 +131,8 @@ impl Crf1dModel {
                             .unwrap(),
                     ) as usize
                 })
-                .collect::<Vec<_>>();
-            label_refs.push(FeatRefs::new(n, v));
+                .collect();
+            label_refs.push(v);
         }
         let mut attr_refs = Vec::new();
         let n_active_attr_refs = u32::from_le_bytes(
@@ -158,7 +146,7 @@ impl Crf1dModel {
             let offset =
                 u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
             let n = u32::from_le_bytes(buffer[offset..offset + 4].try_into().unwrap()) as usize;
-            let v = (0..n)
+            let v: FeatRefs = (0..n)
                 .map(|j| {
                     u32::from_le_bytes(
                         buffer[offset + 4 + 4 * j..offset + 4 + 4 * j + 4]
@@ -166,8 +154,8 @@ impl Crf1dModel {
                             .unwrap(),
                     ) as usize
                 })
-                .collect::<Vec<_>>();
-            attr_refs.push(FeatRefs::new(n, v));
+                .collect();
+            attr_refs.push(v);
         }
         let labels: Vec<(u32, String)> = CQDB::new(&buffer[off_labels as usize..])
             .expect("failed to read labels")
@@ -210,7 +198,7 @@ impl Crf1dModel {
     }
 
     pub(crate) fn crf1dm_get_featureid(&self, refx: &FeatRefs, i: usize) -> usize {
-        refx.fids[i]
+        refx[i]
     }
 
     pub(crate) fn crf1dm_get_feature(&self, fid: usize) -> &Feature {
@@ -221,7 +209,7 @@ impl Crf1dModel {
         println!("TRANSITIONS:");
         for i in 0..self.num_labels() {
             let refs = self.crf1dm_get_labelref(i);
-            for j in 0..refs.num_features {
+            for j in 0..refs.len() {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
                 let from = self.labels.find_by_id(f.src).unwrap_or("NULL".to_string());
@@ -233,7 +221,7 @@ impl Crf1dModel {
         println!("STATE_FEATURES:");
         for i in 0..self.num_attrs() {
             let refs = self.crf1dm_get_attrref(i);
-            for j in 0..refs.num_features {
+            for j in 0..refs.len() {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
                 assert!(f.src == i, "WARNING: an inconsistent attribute reference.");

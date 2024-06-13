@@ -33,7 +33,7 @@ impl<'a> Crf1dTagger<'a> {
             /* Compute transition scores between two labels. */
             for i in 0..L {
                 let edge = model.crf1dm_get_labelref(i);
-                for r in 0..edge.num_features {
+                for r in 0..edge.len() {
                     /* Transition feature from #i to #(f->dst). */
                     let fid = model.crf1dm_get_featureid(edge, r);
                     let f = model.crf1dm_get_feature(fid);
@@ -72,7 +72,7 @@ impl<'a> Tagger for Crf1dTagger<'a> {
                 let value = attr.value;
                 let attr_ref = self.model.crf1dm_get_attrref(attr.aid);
                 /* Loop over the state features associated with the attribute. */
-                for k in 0..attr_ref.num_features {
+                for k in 0..attr_ref.len() {
                     /* The state feature #(attr->fids[r]), which is represented by
                     the attribute #a, outputs the label #(f->dst). */
                     let fid = self.model.crf1dm_get_featureid(attr_ref, k);
