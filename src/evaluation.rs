@@ -37,7 +37,7 @@ struct LabelMeasure {
     /** Number of occurrences of the label in the gold-standard data. */
     num_observation: usize,
     /** Number of predictions. */
-    num_model: usize,
+    num_prediction: usize,
     /** Precision. */
     precision: f64,
     /** Recall. */
@@ -48,7 +48,7 @@ struct LabelMeasure {
 
 /// An overall performance values.
 #[derive(Debug, Default)]
-pub struct Performance {
+pub struct Evaluation {
     /** Number of labels. */
     pub num_labels: usize,
     /** Array of label-wise evaluations. */
@@ -61,7 +61,7 @@ pub struct Performance {
     /** Total number of occurrences of labels in the gold-standard data. */
     item_total_observation: usize,
     /** Total number of predictions. */
-    item_total_model: usize,
+    item_total_prediction: usize,
     /** Item-level accuracy. */
     item_accuracy: f64,
 
@@ -86,13 +86,13 @@ pub struct Estimation {
     pub recall: f64,
 }
 
-impl Performance {
+impl Evaluation {
     pub fn accumulate(&mut self, reference: &[String], prediction: &[String]) {
         let mut matched = 0;
         for (r, p) in zip(reference, prediction) {
             self.tbl.entry(r.to_string()).or_default().num_observation += 1;
-            self.tbl.entry(p.to_string()).or_default().num_model += 1;
-            if r == p {
+            self.tbl.entry(p.to_string()).or_default().num_prediction += 1;
+            if *r == *p {
                 self.tbl.entry(r.to_string()).or_default().num_correct += 1;
                 matched += 1;
             }
@@ -111,15 +111,15 @@ impl Performance {
                 continue;
             }
             self.item_total_correct += lev.num_correct;
-            self.item_total_model += lev.num_model;
+            self.item_total_prediction += lev.num_prediction;
             self.item_total_observation += lev.num_observation;
 
             lev.precision = 0.0;
             lev.recall = 0.0;
             lev.fmeasure = 0.0;
 
-            if lev.num_model > 0 {
-                lev.precision = lev.num_correct as f64 / lev.num_model as f64;
+            if lev.num_prediction > 0 {
+                lev.precision = lev.num_correct as f64 / lev.num_prediction as f64;
             }
             if lev.num_observation > 0 {
                 lev.recall = lev.num_correct as f64 / lev.num_observation as f64;
@@ -146,14 +146,14 @@ impl Performance {
     }
 }
 
-impl Display for Performance {
+impl Display for Evaluation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Performance by label (#match, #model, #ref) (precision, recall, F1):").unwrap();
         for (label, lev) in &self.tbl {
             if lev.num_observation == 0 {
-                writeln!(f, "\t{}: ({}, {}, {}) (******, ******, ******)", label, lev.num_correct, lev.num_model, lev.num_observation).unwrap();
+                writeln!(f, "\t{}: ({}, {}, {}) (******, ******, ******)", label, lev.num_correct, lev.num_prediction, lev.num_observation).unwrap();
             } else {
-                writeln!(f, "\t{}: ({}, {}, {}) ({:.4}, {:.4}, {:.4})", label, lev.num_correct, lev.num_model, lev.num_observation,
+                writeln!(f, "\t{}: ({}, {}, {}) ({:.4}, {:.4}, {:.4})", label, lev.num_correct, lev.num_prediction, lev.num_observation,
                 lev.precision, lev.recall, lev.fmeasure
             ).unwrap();
             }

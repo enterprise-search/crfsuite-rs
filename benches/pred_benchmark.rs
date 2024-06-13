@@ -6,7 +6,7 @@ use std::{
 
 use crfsuite::{
     crf::{data::Instance, tagger::Tagger},
-    Performance,
+    Evaluation,
 };
 
 use crfsuite::crf::{
@@ -40,7 +40,7 @@ fn pred_benchmark(c: &mut Criterion) {
     let model = Crf1dModel::from_path(model_path.into()); //.expect("failed to load model");
     let mut tagger = model.get_tagger(); //.expect("failed to get tagger from model");
 
-    let mut performance = Performance::default();
+    let mut performance = Evaluation::default();
     performance.num_labels = model.num_labels();
 
     let input_path = "test.data";

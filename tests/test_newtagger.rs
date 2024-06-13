@@ -5,7 +5,7 @@ use std::{
 extern crate crfsuite;
 use crfsuite::{
     crf::crf1d::{model::Crf1dModel, tagger::Crf1dTagger},
-    Dataset, Performance,
+    Dataset, Evaluation,
 };
 
 use crate::crfsuite::crf::{
@@ -15,20 +15,13 @@ use crate::crfsuite::crf::{
 };
 
 #[test]
-fn init_tagger() {
-    let buffer = [0; 10];
-    let model = Crf1dModel::from_memory(buffer.to_vec());
-    let tagger = Crf1dTagger::new(&model);
-}
-
-#[test]
 fn tag() {
     let model_path = "ner";
     let input_path = "test.data";
     let model = Crf1dModel::from_path(model_path.into()); //.expect("failed to load model");
     let mut tagger = model.get_tagger(); //.expect("failed to get tagger from model");
-    let mut performance = Performance::default();
-    performance.num_labels = model.num_labels();
+    let mut evaluation = Evaluation::default();
+    evaluation.num_labels = model.num_labels();
     let f = File::open(input_path).expect("failed to open the stream for the input data");
     let mut instance = Instance::default();
     let m_labels = model.get_labels();
@@ -61,7 +54,7 @@ fn tag() {
                     .iter()
                     .map(|i| m_labels.find_by_id(*i).unwrap_or("N/A".into()))
                     .collect::<Vec<_>>();
-                performance.accumulate(&labels, &prediction);
+                evaluation.accumulate(&labels, &prediction);
                 let quiet = false;
                 if !quiet {
                     // output_result
@@ -72,8 +65,8 @@ fn tag() {
         }
     }
     //double sec = (clk1 - clk0) / (double)CLOCKS_PER_SEC;
-    let est = performance.evaluate();
-    println!("perf: {}, est: {:?}", performance, est);
+    let est = evaluation.evaluate();
+    println!("perf: {}, est: {:?}", evaluation, est);
     assert!(
         (est.precision - 0.998457).abs() < 0.00001,
         "{}",
