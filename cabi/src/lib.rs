@@ -11,7 +11,7 @@ use utils::{set_panic_hook, LAST_ERROR};
 #[derive(Debug)]
 pub enum ErrorKind {
     Panic(String),
-    CrfError(crfsuite::CrfError),
+    CrfError(crfsuite::Error),
 }
 
 pub type Result<T> = ::std::result::Result<T, ErrorKind>;
@@ -27,8 +27,8 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-impl From<crfsuite::CrfError> for ErrorKind {
-    fn from(err: crfsuite::CrfError) -> ErrorKind {
+impl From<crfsuite::Error> for ErrorKind {
+    fn from(err: crfsuite::Error) -> ErrorKind {
         ErrorKind::CrfError(err)
     }
 }
