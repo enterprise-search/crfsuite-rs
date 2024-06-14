@@ -33,14 +33,19 @@ pub struct feature {
 
 impl From<feature> for Feature {
     fn from(value: feature) -> Self {
-        Self { cat: value.cat as usize, src: value.src as usize, dst: value.dst as usize, weight: value.weight }
+        Self {
+            cat: value.cat as usize,
+            src: value.src as usize,
+            dst: value.dst as usize,
+            weight: value.weight,
+        }
     }
 }
 
 #[repr(C)]
 pub struct feature_refs {
     num_features: i32,
-    fids: * const i32,
+    fids: *const i32,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -56,27 +61,37 @@ struct T {
 const FT_STATE: i32 = 0;
 
 #[no_mangle]
-pub unsafe extern "C" fn save_model_r(fpath: * const c_char, w: * const f64, 
-    attrs: * const crfsuite_dictionary_t,
-    labels: * const crfsuite_dictionary_t,
-     L: usize, A: usize, K: usize,
-     features: * const feature,
-     attr_refs: * const feature_refs,
-     label_refs: * const feature_refs
-    ) {
+pub unsafe extern "C" fn save_model_r(
+    fpath: *const c_char,
+    w: *const f64,
+    attrs: *const crfsuite_dictionary_t,
+    labels: *const crfsuite_dictionary_t,
+    L: usize,
+    A: usize,
+    K: usize,
+    features: *const feature,
+    attr_refs: *const feature_refs,
+    label_refs: *const feature_refs,
+) {
     log::info!("writing model: {fpath:?}");
     let mut fmap: Vec<i32> = vec![-1; K];
     let mut amap: Vec<i32> = vec![-1; A];
 
     let mut J = 0;
     let mut B = 0;
-    let mut t = T{ num_features: K, ..Default::default() };
+    let mut t = T {
+        num_features: K,
+        ..Default::default()
+    };
     for k in 0..K {
         let pw = w.offset(k as isize);
         if *pw != 0.0 {
             fmap[k] = J;
             J += 1;
-            let f = features.offset(k as isize).as_ref().expect("failed to read feature");
+            let f = features
+                .offset(k as isize)
+                .as_ref()
+                .expect("failed to read feature");
             let mut src = f.src;
             if f.cat == FT_STATE {
                 if amap[f.src as usize] < 0 {
@@ -85,7 +100,12 @@ pub unsafe extern "C" fn save_model_r(fpath: * const c_char, w: * const f64,
                     src = amap[f.src as usize];
                 }
             }
-            let f = Feature { cat: f.cat as usize, src: src as usize, dst: f.dst as usize, weight: *pw };
+            let f = Feature {
+                cat: f.cat as usize,
+                src: src as usize,
+                dst: f.dst as usize,
+                weight: *pw,
+            };
             t.features.push(f);
         }
     }
@@ -94,53 +114,94 @@ pub unsafe extern "C" fn save_model_r(fpath: * const c_char, w: * const f64,
         let mut label: *mut libc::c_char = std::ptr::null_mut();
         let ret = (*labels)
             .to_string
-            .map(|f| f(labels as *mut _, l as i32, &mut label as *mut *mut _ as *mut *const _))
+            .map(|f| {
+                f(
+                    labels as *mut _,
+                    l as i32,
+                    &mut label as *mut *mut _ as *mut *const _,
+                )
+            })
             .expect("failed to read label");
         if ret != 0 || label.is_null() {
             log::error!("failed to read label");
         }
-        let label = CStr::from_ptr(label).to_str().expect("failed to read label").to_string();
+        let label = CStr::from_ptr(label)
+            .to_str()
+            .expect("failed to read label")
+            .to_string();
         t.labels.push(label);
     }
 
     for a in 0..A {
         if amap[a] >= 0 {
             let mut attr: *mut libc::c_char = std::ptr::null_mut();
-        let ret = (*attrs)
-            .to_string
-            .map(|f| f(attrs as *mut _, a as i32, &mut attr as *mut *mut _ as *mut *const _))
-            .expect("failed to read label");
-        if ret != 0 || attr.is_null() {
-            log::error!("failed to read label");
-        }
-        let attr = CStr::from_ptr(attr).to_str().expect("failed to read label").to_string();
-        t.attrs.push(attr);
+            let ret = (*attrs)
+                .to_string
+                .map(|f| {
+                    f(
+                        attrs as *mut _,
+                        a as i32,
+                        &mut attr as *mut *mut _ as *mut *const _,
+                    )
+                })
+                .expect("failed to read label");
+            if ret != 0 || attr.is_null() {
+                log::error!("failed to read label");
+            }
+            let attr = CStr::from_ptr(attr)
+                .to_str()
+                .expect("failed to read label")
+                .to_string();
+            t.attrs.push(attr);
         }
     }
 
     for l in 0..L {
-        let r = label_refs.offset(l as isize).as_ref().expect("failed to read label ref");
-        let r: FeatRefs = (0..r.num_features).map(|x| fmap[*r.fids.offset(x as isize) as usize]).filter(|fid| *fid >= 0).map(|fid| fid as usize).collect();
+        let r = label_refs
+            .offset(l as isize)
+            .as_ref()
+            .expect("failed to read label ref");
+        let r: FeatRefs = (0..r.num_features)
+            .map(|x| fmap[*r.fids.offset(x as isize) as usize])
+            .filter(|fid| *fid >= 0)
+            .map(|fid| fid as usize)
+            .collect();
         t.label_refs.push(r);
     }
 
     t.attr_refs.resize(B as usize, FeatRefs::default());
     for a in 0..A {
         if amap[a] >= 0 {
-            let r = attr_refs.offset(a as isize).as_ref().expect("failed to read attr ref");
+            let r = attr_refs
+                .offset(a as isize)
+                .as_ref()
+                .expect("failed to read attr ref");
             let id = amap[a];
-            let r: FeatRefs = (0..r.num_features).map(|x| fmap[*r.fids.offset(x as isize) as usize]).filter(|fid| *fid >= 0).map(|fid| fid as usize).collect();
+            let r: FeatRefs = (0..r.num_features)
+                .map(|x| fmap[*r.fids.offset(x as isize) as usize])
+                .filter(|fid| *fid >= 0)
+                .map(|fid| fid as usize)
+                .collect();
             t.attr_refs[id as usize] = r;
         }
     }
-    let path = CStr::from_ptr(fpath).to_str().expect("failed to read filename").to_string();
+    let path = CStr::from_ptr(fpath)
+        .to_str()
+        .expect("failed to read filename")
+        .to_string();
     let w = File::create(path + ".json").expect("failed to create file");
     serde_json::to_writer_pretty(w, &t).expect("failed to write");
 }
 
 impl From<T> for Crf1dModel {
     fn from(value: T) -> Self {
-        Self { attr_refs: value.attr_refs, label_refs: value.label_refs, features: value.features, labels: Quark::new(&value.labels), attrs: Quark::new(&value.attrs) }
+        Self {
+            attr_refs: value.attr_refs,
+            label_refs: value.label_refs,
+            features: value.features,
+            labels: Quark::new(&value.labels),
+            attrs: Quark::new(&value.attrs),
+        }
     }
 }
 
@@ -159,7 +220,7 @@ impl Crf1dModel {
         let t: T = serde_json::from_reader(f).expect("failed to read model");
         Self::from(t)
     }
-    
+
     pub fn from_path(path: PathBuf) -> Self {
         Self::from_memory(std::fs::read(path).expect("failed to read model"))
     }
