@@ -395,14 +395,18 @@ impl Model for Crf1dModel {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
 
     #[test]
     fn json() {
+        let start = Instant::now();
         let path = "ner.json";
         let f = File::open(path).expect("failed to open file");
         let t: T = serde_json::from_reader(f).expect("failed to parse model");
         let model = Crf1dModel::from(t);
+        println!("took {:?} to load model", start.elapsed());
         assert_eq!(model.attr_refs.len(), 22033);
         assert_eq!(model.attrs.len(), 22033);
         assert_eq!(model.label_refs.len(), 9);
