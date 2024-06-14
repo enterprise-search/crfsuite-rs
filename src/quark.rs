@@ -2,41 +2,45 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+pub trait StringTable {
+    fn to_str(&self, id: usize) -> Option<&str>;
+    fn to_id(&self, s: &str) -> Option<usize>;
+    fn len(&self) -> usize;
+}
+
+pub trait TextVectorizer {
+    fn find_or_insert(&mut self, key: &str) -> usize;
+}
+
+#[derive(Debug, Default)]
 pub struct Quark {
     v: Vec<String>,
     m: HashMap<String, usize>,
 }
 
-impl From<Vec<(u32, String)>> for Quark {
-    fn from(value: Vec<(u32, String)>) -> Self {
-        let mut this = Self::default();
-        for (i, s) in value {
-            let p = s.as_str();
-            this.v.push(s.clone());
-            this.m.insert(s, i as usize);
-        }
-        this
+impl From<Vec<String>> for Quark {
+    fn from(value: Vec<String>) -> Self {
+        let m = value.iter().enumerate().map(|(i,s)| (s.to_string(),i)).collect();
+        Self { v: value, m }
     }
 }
 
-impl Quark {
-    pub fn new(v: &[(String)]) -> Self {
-        Self { v: v.to_vec(), m: v.iter().enumerate().map(|(i,s)| (s.to_string(), i)).collect() }
+impl StringTable for Quark {
+    fn to_str(&self, id: usize) -> Option<&str> {
+        self.v.get(id).map(|x| x.as_str())
     }
 
-    pub fn find_by_id(&self, id: usize) -> Option<String> {
-        if self.v.len() > id {
-            return Some(self.v[id].to_string());
-        }
-        return None
+    fn to_id(&self, s: &str) -> Option<usize> {
+        self.m.get(s).copied()
     }
-
-    pub fn find(&self, key: &str) -> Option<usize> {
-        self.m.get(key).copied()
+    
+    fn len(&self) -> usize {
+        self.v.len()
     }
+}
 
-    pub fn find_or_insert(&mut self, key: &str) -> usize {
+impl TextVectorizer for Quark {
+    fn find_or_insert(&mut self, key: &str) -> usize {
         if self.m.contains_key(key) {
             return self.m[key];
         }
@@ -45,9 +49,11 @@ impl Quark {
         self.v.push(key.to_string());
         idx
     }
+}
 
-    pub fn len(&self) -> usize {
-        self.v.len()
+impl Quark {
+    pub fn new(v: &[(String)]) -> Self {
+        Self { v: v.to_vec(), m: v.iter().enumerate().map(|(i,s)| (s.to_string(), i)).collect() }
     }
 }
 
@@ -68,8 +74,8 @@ mod tests {
         let mut quark = Quark::default();
         quark.find_or_insert("zero");
         quark.find_or_insert("one");
-        assert_eq!(quark.find_by_id(0), Some("zero".to_string()));
-        assert_eq!(quark.find_by_id(1), Some("one".into()));
-        assert_eq!(quark.find_by_id(2), None);
+        assert_eq!(quark.to_str(0), Some("zero"));
+        assert_eq!(quark.to_str(1), Some("one"));
+        assert_eq!(quark.to_str(2), None);
     }
 }

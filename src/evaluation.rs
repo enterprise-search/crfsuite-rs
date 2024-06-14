@@ -87,7 +87,7 @@ pub struct Estimation {
 }
 
 impl Evaluation {
-    pub fn accumulate(&mut self, reference: &[String], prediction: &[String]) {
+    pub fn accumulate(&mut self, reference: &[String], prediction: &[&str]) {
         let mut matched = 0;
         for (r, p) in zip(reference, prediction) {
             self.tbl.entry(r.to_string()).or_default().num_observation += 1;

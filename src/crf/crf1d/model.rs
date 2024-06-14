@@ -5,7 +5,7 @@ use crfsuite_sys::crfsuite_dictionary_t;
 use libc::c_char;
 use serde::{Deserialize, Serialize};
 
-use crate::{crf::model::Model, quark::Quark};
+use crate::{crf::model::Model, quark::{Quark, StringTable}};
 
 use super::tagger::Crf1dTagger;
 
@@ -186,7 +186,7 @@ impl From<T> for Crf1dModel {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Crf1dModel {
     attr_refs: Vec<FeatRefs>,
     label_refs: Vec<FeatRefs>,
@@ -349,8 +349,8 @@ impl Crf1dModel {
             for j in 0..refs.len() {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
-                let from = self.labels.find_by_id(f.src as usize).unwrap_or("NULL".to_string());
-                let to = self.labels.find_by_id(f.dst as usize).unwrap_or("NULL".to_string());
+                let from = self.labels.to_str(f.src as usize).unwrap_or("NULL");
+                let to = self.labels.to_str(f.dst as usize).unwrap_or("NULL");
                 println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
             }
         }
@@ -362,8 +362,8 @@ impl Crf1dModel {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
                 assert!(f.src as usize == i, "WARNING: an inconsistent attribute reference.");
-                let from = self.attrs.find_by_id(f.src as usize).unwrap_or("NULL".to_string());
-                let to = self.labels.find_by_id(f.dst as usize).unwrap_or("NULL".to_string());
+                let from = self.attrs.to_str(f.src as usize).unwrap_or("NULL");
+                let to = self.labels.to_str(f.dst as usize).unwrap_or("NULL");
                 println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
             }
         }
