@@ -37,7 +37,7 @@ impl<'a> Crf1dTagger<'a> {
                     /* Transition feature from #i to #(f->dst). */
                     let fid = model.crf1dm_get_featureid(edge, r);
                     let f = model.crf1dm_get_feature(fid);
-                    ctx.trans[ctx.num_labels * i + f.dst] = f.weight;
+                    ctx.trans[ctx.num_labels * i + f.dst as usize] = f.weight;
                 }
             }
         }
@@ -77,7 +77,7 @@ impl<'a> Tagger for Crf1dTagger<'a> {
                     the attribute #a, outputs the label #(f->dst). */
                     let fid = self.model.crf1dm_get_featureid(attr_ref, k);
                     let f = self.model.crf1dm_get_feature(fid);
-                    self.ctx.state[self.ctx.num_labels * i + f.dst] += f.weight * value;
+                    self.ctx.state[self.ctx.num_labels * i + f.dst as usize] += f.weight * value;
                 }
             }
         }

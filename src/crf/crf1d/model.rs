@@ -1,4 +1,4 @@
-use std::{convert::TryInto, ffi::CStr, fs::File, path::PathBuf};
+use std::{convert::TryInto, ffi::CStr, fs::File, io::Write, path::PathBuf};
 
 use cqdb::CQDB;
 use crfsuite_sys::crfsuite_dictionary_t;
@@ -14,32 +14,13 @@ type FeatRefs = Vec<usize>;
 #[derive(Debug)]
 pub enum FeatCat {}
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Feature {
-    pub cat: usize,
-    pub src: usize,
-    pub dst: usize,
-    pub weight: f64,
-}
-
 #[repr(C)]
 #[derive(Debug, Serialize, Deserialize)]
-pub struct feature {
-    pub cat: i32,
-    pub src: i32,
-    pub dst: i32,
+pub struct Feature {
+    pub cat: u32,
+    pub src: u32,
+    pub dst: u32,
     pub weight: f64,
-}
-
-impl From<feature> for Feature {
-    fn from(value: feature) -> Self {
-        Self {
-            cat: value.cat as usize,
-            src: value.src as usize,
-            dst: value.dst as usize,
-            weight: value.weight,
-        }
-    }
 }
 
 #[repr(C)]
@@ -58,7 +39,7 @@ struct T {
     label_refs: Vec<FeatRefs>,
 }
 
-const FT_STATE: i32 = 0;
+const FT_STATE: u32 = 0;
 
 #[no_mangle]
 pub unsafe extern "C" fn save_model_r(
@@ -69,7 +50,7 @@ pub unsafe extern "C" fn save_model_r(
     L: usize,
     A: usize,
     K: usize,
-    features: *const feature,
+    features: *const Feature,
     attr_refs: *const feature_refs,
     label_refs: *const feature_refs,
 ) {
@@ -97,13 +78,13 @@ pub unsafe extern "C" fn save_model_r(
                 if amap[f.src as usize] < 0 {
                     amap[f.src as usize] = B;
                     B += 1;
-                    src = amap[f.src as usize];
+                    src = amap[f.src as usize] as u32;
                 }
             }
             let f = Feature {
-                cat: f.cat as usize,
-                src: src as usize,
-                dst: f.dst as usize,
+                cat: f.cat,
+                src: src,
+                dst: f.dst,
                 weight: *pw,
             };
             t.features.push(f);
@@ -262,9 +243,9 @@ impl Crf1dModel {
             let weight: f64 =
                 f64::from_le_bytes(buffer[offset + 12..offset + 20].try_into().unwrap());
             let f = Feature {
-                cat: cat as usize,
-                src: src as usize,
-                dst: dst as usize,
+                cat,
+                src,
+                dst,
                 weight,
             };
             features.push(f);
@@ -368,8 +349,8 @@ impl Crf1dModel {
             for j in 0..refs.len() {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
-                let from = self.labels.find_by_id(f.src).unwrap_or("NULL".to_string());
-                let to = self.labels.find_by_id(f.dst).unwrap_or("NULL".to_string());
+                let from = self.labels.find_by_id(f.src as usize).unwrap_or("NULL".to_string());
+                let to = self.labels.find_by_id(f.dst as usize).unwrap_or("NULL".to_string());
                 println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
             }
         }
@@ -380,9 +361,9 @@ impl Crf1dModel {
             for j in 0..refs.len() {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
-                assert!(f.src == i, "WARNING: an inconsistent attribute reference.");
-                let from = self.attrs.find_by_id(f.src).unwrap_or("NULL".to_string());
-                let to = self.labels.find_by_id(f.dst).unwrap_or("NULL".to_string());
+                assert!(f.src as usize == i, "WARNING: an inconsistent attribute reference.");
+                let from = self.attrs.find_by_id(f.src as usize).unwrap_or("NULL".to_string());
+                let to = self.labels.find_by_id(f.dst as usize).unwrap_or("NULL".to_string());
                 println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
             }
         }
