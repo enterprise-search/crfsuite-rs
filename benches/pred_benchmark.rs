@@ -5,8 +5,7 @@ use std::{
 };
 
 use crfsuite::{
-    crf::{data::Instance, tagger::Tagger},
-    Evaluation,
+    crf::{data::Instance, tagger::Tagger}, quark::StringTable, Evaluation
 };
 
 use crfsuite::crf::{
@@ -56,11 +55,11 @@ fn pred_benchmark(c: &mut Criterion) {
             if let Some((label, attrs)) = line.split_once('\t') {
                 let item: Item = attrs
                     .split('\t')
-                    .map(|s| m_attrs.find(s))
+                    .map(|s| m_attrs.to_id(s))
                     .flatten()
                     .map(|i| Attr::new(i, 1.0))
                     .collect();
-                instance.append(item, m_labels.find(label).unwrap_or(labels.len()));
+                instance.append(item, m_labels.to_id(label).unwrap_or(labels.len()));
                 labels.push(label.to_string());
             } else {
                 log::warn!("invalid line: {line}");

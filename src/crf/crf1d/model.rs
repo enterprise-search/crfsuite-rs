@@ -180,8 +180,8 @@ impl From<T> for Crf1dModel {
             attr_refs: value.attr_refs,
             label_refs: value.label_refs,
             features: value.features,
-            labels: Quark::new(&value.labels),
-            attrs: Quark::new(&value.attrs),
+            labels: Quark::from(value.labels),
+            attrs: Quark::from(value.attrs),
         }
     }
 }

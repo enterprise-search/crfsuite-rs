@@ -51,12 +51,6 @@ impl TextVectorizer for Quark {
     }
 }
 
-impl Quark {
-    pub fn new(v: &[(String)]) -> Self {
-        Self { v: v.to_vec(), m: v.iter().enumerate().map(|(i,s)| (s.to_string(), i)).collect() }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
