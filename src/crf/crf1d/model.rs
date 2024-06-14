@@ -296,17 +296,17 @@ impl Crf1dModel {
                 .collect();
             attr_refs.push(v);
         }
-        let labels: Vec<(u32, String)> = CQDB::new(&buffer[off_labels as usize..])
+        let labels: Vec<String> = CQDB::new(&buffer[off_labels as usize..])
             .expect("failed to read labels")
             .iter()
             .map(Result::unwrap)
-            .map(|(k, v)| (k, v.to_string()))
+            .map(|(k, v)| v.to_string())
             .collect();
-        let attrs: Vec<(u32, String)> = CQDB::new(&buffer[off_attrs as usize..])
+        let attrs: Vec<String> = CQDB::new(&buffer[off_attrs as usize..])
             .expect("failed to read attrs")
             .iter()
             .map(Result::unwrap)
-            .map(|(k, v)| (k, v.to_string()))
+            .map(|(k, v)| v.to_string())
             .collect();
 
         Self {
@@ -389,7 +389,7 @@ impl Model for Crf1dModel {
 
     fn save(&self, path: std::path::PathBuf) {
         let w = File::create(path).expect("failed to create file");
-        serde_json::to_writer(w, self).expect("failed to write");
+        // serde_json::to_writer(w, self).expect("failed to write");
     }
 }
 
