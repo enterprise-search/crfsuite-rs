@@ -361,6 +361,11 @@ mod tests {
         let f = File::open(path).expect("failed to open file");
         let t: T = serde_json::from_reader(f).expect("failed to parse model");
         let model = Crf1dModel::from(t);
+        assert_eq!(model.attr_refs.len(), 22033);
+        assert_eq!(model.attrs.len(), 22033);
+        assert_eq!(model.label_refs.len(), 9);
+        assert_eq!(model.labels.len(), 9);
+        assert_eq!(model.features.len(), 29169);
     }
 
     #[test]
