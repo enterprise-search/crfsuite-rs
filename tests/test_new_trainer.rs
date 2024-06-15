@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use crfsuite::{crf::{lbfgs::Lbfgs, trainer::{Crf1dTrainer, TagEncoder}}, Dataset};
+use crfsuite::{crf::{lbfgs::{self, Lbfgs}, trainer::{Crf1dTrainer, TagEncoder}}, Dataset};
 
 
 #[test]
@@ -12,7 +12,6 @@ fn train() {
     assert_eq!(1915, ds.len(), "read count mismatch");
     let fpath = "ner_new.json";
     let holdout = usize::MAX;
-    let mut encoder = TagEncoder::new();
-    let mut trainer = Lbfgs::new(encoder, std::ptr::addr_of!(ds));
-    trainer.train(&ds, fpath.into(), holdout)
+    let encoder = TagEncoder::new();
+    lbfgs::train(encoder, &ds, fpath.into(), holdout);
 }

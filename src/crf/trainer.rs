@@ -7,7 +7,7 @@ use liblbfgs_sys::{
     LBFGS_LINESEARCH_MORETHUENTE,
 };
 
-use crate::{crf::crf1d::context::ResetOpt, Algorithm, Dataset};
+use crate::{crf::crf1d::context::ResetOpt, Algorithm, Dataset, Sequence};
 
 use super::crf1d::{context::{Crf1dContext, Opt}, model::FeatRefs};
 
@@ -50,7 +50,7 @@ struct Crf1de {
     features: Vec<Feat>,
     attrs: Vec<FeatRefs>,
     forward_trans: Vec<FeatRefs>,
-    ctx: Option<Crf1dContext>,
+    ctx: Crf1dContext,
 }
 
 impl Crf1de {
@@ -68,7 +68,7 @@ impl Crf1de {
         let N = ds.len();
         let T = ds.max_seq_length();
         log::info!("set data (L: {L}, A: {A}, N: {N}, T: {T})");
-        self.ctx = Some(Crf1dContext::new(&[Opt::CTXF_VITERBI, Opt::CTXF_MARGINALS], L, T));
+        self.ctx = Crf1dContext::new(&[Opt::CTXF_VITERBI, Opt::CTXF_MARGINALS], L, T);
         log::info!("TODO: opts info");
         let begin = Instant::now();
         self.features = crf1df_generate(ds, self.opt.feature_possible_states, self.opt.feature_possible_transitions, self.opt.feature_minfreq);
@@ -77,6 +77,72 @@ impl Crf1de {
         self.attrs.resize(A, FeatRefs::default());
         self.forward_trans.resize(L, FeatRefs::default());
         crf1df_init_references(&mut self.attrs, &mut self.forward_trans, &self.features);
+    }
+    
+    fn state_score(&mut self, seq: &crate::Sequence, w: *const f64) {
+        let L = self.num_labels();
+        let T = seq.len();
+
+        /* Loop over the items in the sequence. */
+        for t in 0..T {
+            let item = &seq.items[t];
+
+            /* Loop over the contents (attributes) attached to the item. */
+            for attr in item {
+                /* Access the list of state features associated with the attribute. */
+                let attr_feat_refs = &self.attrs[attr.id as usize];
+
+                /* Loop over the state features associated with the attribute. */
+                for fid in attr_feat_refs {
+                    /* State feature associates the attribute #a with the label #(f->dst). */
+                    let f = &self.features[*fid];
+                    self.ctx.state[self.ctx.num_labels * (t) + f.dst as usize] += unsafe { *w.offset(*fid as isize) } * attr.value;
+                }
+            }
+        }
+    }
+    
+    fn transition_score(&mut self, w: *const f64) {
+        let L = self.num_labels();
+        for i in 0..L {
+            let edge = &self.forward_trans[i];
+            for fid in edge {
+                self.ctx.trans[self.ctx.num_labels * i + self.features[*fid].dst as usize] = unsafe { *w.offset(*fid as isize) }
+            }
+        }
+    }
+    
+    fn model_expectation(&self, seq: &Sequence, w: *mut f64, weight: f64) {
+        let T = seq.len();
+        let L = self.num_labels();
+
+        for t in 0..T {
+            let item = &seq.items[t];
+
+            /* Compute expectations for state features at position #t. */
+            for c in 0..item.len() {
+                /* Access the attribute. */
+                for attr in item {
+                    let attr_feat_refs = &self.attrs[attr.id as usize];
+
+                    /* Loop over state features for the attribute. */
+                    for fid in attr_feat_refs {
+                        let f = &self.features[*fid];
+                        unsafe { *w.offset(*fid as isize) += (self.ctx.mexp_state)[(self.ctx.num_labels) * (t) + (f.dst as usize)] * attr.value * weight };
+                    }
+
+                }
+            }
+        }
+
+        /* Loop over the labels (t, i) */
+        for i in 0..L {
+            let edge = &self.forward_trans[i];
+            for fid in edge {
+                let f = &self.features[*fid];
+                unsafe { *w.offset(*fid as isize) += (self.ctx.mexp_trans)[(self.ctx.num_labels) * (i) + (f.dst as usize)] * weight };
+            }
+        }
     }
 }
 
@@ -199,7 +265,8 @@ impl TagEncoder {
     }
     
     /* LEVEL_NONE -> LEVEL_NONE. */
-    pub(crate) fn objective_and_gradients_batch(&mut self, ds: &Dataset, w: *const f64, g: *mut f64) -> f64 {        
+    pub(crate) fn objective_and_gradients_batch(&mut self, ds: &Dataset, w: *const f64, g: *mut f64) -> f64 {   
+        log::error!("LEN: {}", ds.len())     ;
         let N = ds.len();
         let K = self.internal.num_features();
 
@@ -212,28 +279,27 @@ impl TagEncoder {
         Set the scores (weights) of transition features here because
         these are independent of input label sequences.
         */
-        let ctx = self.internal.ctx.as_mut().expect("no ctx");
-        ctx.reset(&[ResetOpt::RF_TRANS]);
+        self.internal.ctx.reset(&[ResetOpt::RF_TRANS]);
         self.internal.transition_score(w);
-        ctx.crf1dc_exp_transition();
+        self.internal.ctx.crf1dc_exp_transition();
 
         /// Compute model expectations.
         let mut logp = 0.0;
         let mut logl = 0.0;
         for seq in &ds.v {
             /* Set label sequences and state scores. */
-            ctx.crf1dc_set_num_items(seq.len());
-            ctx.reset(&[ResetOpt::RF_STATE]);
+            self.internal.ctx.crf1dc_set_num_items(seq.len());
+            self.internal.ctx.reset(&[ResetOpt::RF_STATE]);
             self.internal.state_score(seq, w);
-            ctx.crf1dc_exp_state();
+            self.internal.ctx.crf1dc_exp_state();
 
             /* Compute forward/backward scores. */
-            ctx.crf1dc_alpha_score();
-            ctx.crf1dc_beta_score();
-            ctx.crf1dc_marginals();
+            self.internal.ctx.crf1dc_alpha_score();
+            self.internal.ctx.crf1dc_beta_score();
+            self.internal.ctx.crf1dc_marginals();
 
             /* Compute the probability of the input sequence on the model. */
-            logp = ctx.crf1dc_score(seq.labels) - ctx.crf1dc_lognorm();
+            logp = self.internal.ctx.crf1dc_score(&seq.labels) - self.internal.ctx.crf1dc_lognorm();
             /* Update the log-likelihood. */
             logl += logp * seq.weight;
 
