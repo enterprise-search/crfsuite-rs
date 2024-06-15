@@ -278,56 +278,50 @@ impl Crf1dContext {
     }
 
     pub(crate) fn crf1dc_exp_state(&mut self) {
-        for (a, b) in zip(&self.state, &mut self.exp_state) {
-            *b = a.exp();
+        for i in 0..self.state.len() {
+            self.exp_state[i] = self.state[i].exp();
         }
     }
 
     pub(crate) fn crf1dc_alpha_score(&mut self) {
         let L = self.num_labels;
+        let T = self.num_items;
 
         /* Compute the alpha scores on nodes (0, *). alpha[0][j] = state[0][j] */
-        let mut sum = 0.0;
         for i in 0..L {
-            self.exp_state[(self.num_labels) * (0) + (i)] =
-                (self.alpha_score)[(self.num_labels) * (0) + (i)];
-            sum += (self.alpha_score)[(self.num_labels) * (0) + (i)];
+            (self.alpha_score)[(self.num_labels) * (0) + (i)] = (self.exp_state)[(self.num_labels) * (0) + (i)];
         }
-        self.scale_factor.clear();
-        let scale = if sum != 0.0 { 1.0 / sum } else { 1.0 };
-        self.scale_factor.push(scale);
+        let mut sum = 0.0;
+        for i in 0..L {            
+            sum += (self.alpha_score)[(self.num_labels) * (0) + (i)];
+        }        
+        self.scale_factor[0] = if sum != 0.0 { 1.0 / sum } else { 1.0 };
         for i in 0..L {
-            (self.alpha_score)[(self.num_labels) * (0) + (i)] *= scale;
+            (self.alpha_score)[(self.num_labels) * (0) + (i)] *= self.scale_factor[0];
         }
 
         /* Compute the alpha scores on nodes (t, *).
             alpha[t][j] = state[t][j] * \sum_{i} alpha[t-1][i] * trans[i][j]
-        */
-        let T = self.num_items;
+        */        
         for t in 1..T {
             for i in 0..L {
                 ((self.alpha_score)[(self.num_labels) * (t) + (i)]) = 0.0;
             }
             for i in 0..L {
                 for j in 0..L {
-                    ((self.alpha_score)[(self.num_labels) * (t) + (j)]) += ((self.alpha_score)
-                        [(self.num_labels) * (t - 1) + (0)])
-                        * ((self.exp_trans)[(self.num_labels) * (i) + (j)]);
+                    (self.alpha_score)[(self.num_labels) * (t) + (j)] += (self.alpha_score)[(self.num_labels) * (t - 1) + (i)] * (self.exp_trans)[(self.num_labels) * (i) + (j)];
                 }
             }
             for i in 0..L {
-                ((self.alpha_score)[(self.num_labels) * (t) + (i)]) *=
-                    ((self.exp_state)[(self.num_labels) * (t) + (i)]);
+                (self.alpha_score)[(self.num_labels) * (t) + (i)] *= (self.exp_state)[(self.num_labels) * (t) + (i)];
             }
             sum = 0.0;
             for i in 0..L {
-                sum += ((self.alpha_score)[(self.num_labels) * (t) + (i)]);
+                sum += (self.alpha_score)[(self.num_labels) * (t) + (i)];
             }
-            let scale = if sum != 0.0 { 1.0 / sum } else { 1.0 };
-            self.scale_factor.push(scale);
-
+            self.scale_factor[t] = if sum != 0.0 { 1.0 / sum } else { 1.0 };
             for i in 0..L {
-                (self.alpha_score)[(self.num_labels) * (t) + (0)] *= scale;
+                (self.alpha_score)[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
             }
         }
 
@@ -335,7 +329,11 @@ impl Crf1dContext {
         norm = 1. / (C[0] * C[1] ... * C[T-1])
         log(norm) = - \sum_{t = 0}^{T-1} log(C[t]).
         */
-        self.log_norm = -self.scale_factor.iter().map(|&x| x.ln()).sum::<f64>();
+        sum = 0.0;
+        for i in 0..T {
+            sum += self.scale_factor[i].ln();
+        }
+        self.log_norm = -sum;
     }
 
     pub(crate) fn crf1dc_beta_score(&mut self) {
@@ -343,16 +341,9 @@ impl Crf1dContext {
         let L = self.num_labels;
 
         /* Compute the beta scores at (T-1, *). */
-        let mut scale_index = T - 1;
-        let scale = self.scale_factor[scale_index];
-
         for i in 0..L {
-            (self.beta_score)[(self.num_labels) * (T - 1) + (i)] = scale;
-        }
-        if scale_index == 0 {
-            return;
-        }
-        scale_index -= 1;
+            (self.beta_score)[(self.num_labels) * (T - 1) + (i)] = self.scale_factor[T-1];
+        }        
 
         /* Compute the beta scores at (t, *). */
         for t in (0..T - 1).rev() {
@@ -371,14 +362,8 @@ impl Crf1dContext {
                 }
                 (self.beta_score)[(self.num_labels) * (t) + (i)] = s;
             }
-            let scale = self.scale_factor[scale_index];
             for i in 0..L {
-                (self.beta_score)[(self.num_labels) * (t) + (i)] *= scale;
-            }
-            if scale_index > 0 {
-                scale_index -= 1;
-            } else {
-                println!("eq zero");
+                (self.beta_score)[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
             }
         }
     }

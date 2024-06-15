@@ -22,3 +22,9 @@ fn train() {
     let encoder = TagEncoder::new();
     lbfgs::train(encoder, &ds, fpath.into(), holdout);
 }
+
+#[test]
+fn math() {
+    let f = 12.34_f64;
+    println!("{}", f.exp());
+}
