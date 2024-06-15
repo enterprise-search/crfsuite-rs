@@ -60,7 +60,7 @@ fn main() {
                 if !(labels.is_empty() || items.is_empty()) {
                     let prediction = tagger.tag(&items).expect("failed to tag");
                     if argv.evaluate {
-                        evaluation.accumulate(&labels, &prediction);
+                        evaluation.accumulate(&labels, &prediction.iter().map(AsRef::as_ref).collect::<Vec<_>>().as_slice());
                     }
                     if !argv.quiet {
                         // output_result

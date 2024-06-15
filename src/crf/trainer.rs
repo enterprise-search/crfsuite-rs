@@ -1,10 +1,15 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::quark::Quark;
 
 use super::data::Data;
 
 
-pub trait Trainer {
-    fn train(&self, data: Data, fpath: Path, holdout: usize);
+pub struct  Crf1dTrainer {
+}
+
+impl Crf1dTrainer {
+    fn train(&self, data: Data, fpath: PathBuf, holdout: usize) {
+        todo!()
+    }
 }

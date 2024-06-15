@@ -1,15 +1,25 @@
-use std::{fs::File, io::{BufRead, BufReader}};
+use std::{fs::File, io::{BufRead, BufReader}, path::PathBuf};
 
-use crate::{Attribute, Item};
+
+use crate::{quark::{Quark, TextVectorizer}, Attribute, Error, Item};
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct Attr {
+    id: i32,
+    value: f64,
+}
+
+pub type Token = Vec<Attr>;
 
 #[derive(Debug, Default)]
 pub struct Sequence {
-    pub items: Vec<Item>,
-    pub labels: Vec<String>,
+    pub items: Vec<Token>,
+    pub labels: Vec<usize>,
 }
 
 impl Sequence {
-    pub fn push(&mut self, item: Item, label: String) {
+    pub fn push(&mut self, item: Token, label: usize) {
         self.items.push(item);
         self.labels.push(label);
     }
@@ -24,28 +34,33 @@ impl Sequence {
 }
 
 #[derive(Debug, Default)]
-pub struct Dataset(pub Vec<Sequence>);
+pub struct Dataset {
+    pub v: Vec<Sequence>,
+    pub n_labels: usize,
+    pub n_attrs: usize,
+}
 
-impl From<File> for Dataset {
-    fn from(value: File) -> Self {
-        let mut dataset = Dataset::default();
-        let mut sequence = Sequence::default();
-        for line in BufReader::new(value).lines() {
-            let line = line.expect("failed to read line");
+impl Dataset {
+    pub fn read_file(&mut self, file: File, mut attrv: impl TextVectorizer, mut labelv: impl TextVectorizer) -> Result<(), std::io::Error> {
+        let mut seq = Sequence::default();
+        for line in BufReader::new(file).lines() {
+            let line = line?;
             if !line.is_empty() {
                 if let Some((label, attrs)) = line.split_once('\t') {
-                    let item: Item = attrs.split('\t').map(Attribute::from).collect();
-                    sequence.push(item, label.to_string());
+                    let item: Token = attrs.split('\t').map(|s| Attr { id: attrv.find_or_insert(s) as i32, value: 1.0 }).collect();
+                    seq.push(item, labelv.find_or_insert(&label));
                 } else {
                     log::warn!("invalid line: {line}");
                 }
             } else {
-                if !(sequence.is_empty()) {
-                    dataset.0.push(sequence);
-                    sequence = Sequence::default();
+                if !(seq.is_empty()) {
+                    self.v.push(seq);
+                    seq = Sequence::default();
                 }
             }
         }
-        dataset
+        self.n_attrs = attrv.len();
+        self.n_labels = labelv.len();
+        Ok(())
     }
 }

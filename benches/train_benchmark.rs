@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufRead, path::Path};
+use std::{fs::File, io::BufRead, path::Path, time::Duration};
 
 use crfsuite::{Attribute, Item, Trainer};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -11,7 +11,7 @@ fn train(fpath: &Path) {
     let parameters = vec![
         "c1=0.1",
         "c2=0.1",
-        "max_iterations=100",
+        "max_iterations=30",
         "feature.possible_transitions=1",
     ];
     parameters.iter().for_each(|s| {
@@ -66,5 +66,9 @@ fn train_benchmark(c: &mut Criterion) {
     c.bench_function("train", |b| b.iter(|| train(black_box(&fpath))));
 }
 
-criterion_group!(benchmarks, train_benchmark);
+criterion_group! {
+    name = benchmarks;
+    config = Criterion::default().measurement_time(Duration::from_secs(10));
+    targets = train_benchmark
+}
 criterion_main!(benchmarks);

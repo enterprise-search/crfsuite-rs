@@ -10,6 +10,7 @@ pub trait StringTable {
 
 pub trait TextVectorizer {
     fn find_or_insert(&mut self, key: &str) -> usize;
+    fn len(&self) -> usize;
 }
 
 #[derive(Debug, Default)]
@@ -48,6 +49,10 @@ impl TextVectorizer for Quark {
         self.m.insert(key.to_string(), idx);
         self.v.push(key.to_string());
         idx
+    }
+    
+    fn len(&self) -> usize {
+        self.v.len()
     }
 }
 
