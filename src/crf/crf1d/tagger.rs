@@ -1,4 +1,5 @@
-use crate::crf::{data::Instance, tagger::Tagger};
+use crate::crf::tagger::Tagger;
+use crate::Sequence;
 
 use super::context::Crf1dContext;
 use super::{
@@ -59,7 +60,7 @@ impl<'a> Crf1dTagger<'a> {
 }
 
 impl<'a> Tagger for Crf1dTagger<'a> {
-    fn set_instance(&mut self, instance: &Instance) {
+    fn set_seq(&mut self, instance: &Sequence) {
         let T = instance.len();
         self.ctx.crf1dc_set_num_items(T);
         self.ctx.reset(&[ResetOpt::RF_STATE]);
@@ -70,7 +71,7 @@ impl<'a> Tagger for Crf1dTagger<'a> {
             for attr in item {
                 /* A scale usually represents the atrribute frequency in the item. */
                 let value = attr.value;
-                let attr_ref = self.model.crf1dm_get_attrref(attr.aid);
+                let attr_ref = self.model.crf1dm_get_attrref(attr.id as usize);
                 /* Loop over the state features associated with the attribute. */
                 for k in 0..attr_ref.len() {
                     /* The state feature #(attr->fids[r]), which is represented by
@@ -88,23 +89,23 @@ impl<'a> Tagger for Crf1dTagger<'a> {
         todo!()
     }
 
-    fn viterbi(&mut self, labels: &mut Vec<usize>) -> crate::crf::data::Float {
+    fn viterbi(&mut self, labels: &mut Vec<usize>) -> f64 {
         self.ctx.viterbi(labels)
     }
 
-    fn lognorm(&self) -> crate::crf::data::Float {
+    fn lognorm(&self) -> f64 {
         todo!()
     }
 
-    fn marginal_point(&self, l: usize, t: usize) -> crate::crf::data::Float {
+    fn marginal_point(&self, l: usize, t: usize) -> f64 {
         todo!()
     }
 
-    fn marginal_path(&self, path: Vec<usize>, begin: usize, end: usize) -> crate::crf::data::Float {
+    fn marginal_path(&self, path: Vec<usize>, begin: usize, end: usize) -> f64 {
         todo!()
     }
 
-    fn score(&self, path: Vec<usize>) -> crate::crf::data::Float {
+    fn score(&self, path: Vec<usize>) -> f64 {
         todo!()
     }
 }
