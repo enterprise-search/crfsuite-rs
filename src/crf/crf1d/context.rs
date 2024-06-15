@@ -272,28 +272,29 @@ impl Crf1dContext {
         /* Return the maximum score (without the normalization factor subtracted). */
         max_score
     }
-    
+
     pub(crate) fn crf1dc_lognorm(&self) -> f64 {
         self.log_norm
     }
-    
+
     pub(crate) fn crf1dc_exp_state(&mut self) {
         for (a, b) in zip(&self.state, &mut self.exp_state) {
             *b = a.exp();
         }
     }
-    
-    pub(crate) fn crf1dc_alpha_score(&mut self) {        
+
+    pub(crate) fn crf1dc_alpha_score(&mut self) {
         let L = self.num_labels;
 
         /* Compute the alpha scores on nodes (0, *). alpha[0][j] = state[0][j] */
         let mut sum = 0.0;
         for i in 0..L {
-            self.exp_state[(self.num_labels) * (0) + (i)] = (self.alpha_score)[(self.num_labels) * (0) + (i)];
+            self.exp_state[(self.num_labels) * (0) + (i)] =
+                (self.alpha_score)[(self.num_labels) * (0) + (i)];
             sum += (self.alpha_score)[(self.num_labels) * (0) + (i)];
         }
         self.scale_factor.clear();
-        let scale = if sum != 0.0 { 1.0/sum } else { 1.0 };
+        let scale = if sum != 0.0 { 1.0 / sum } else { 1.0 };
         self.scale_factor.push(scale);
         for i in 0..L {
             (self.alpha_score)[(self.num_labels) * (0) + (i)] *= scale;
@@ -305,21 +306,24 @@ impl Crf1dContext {
         let T = self.num_items;
         for t in 1..T {
             for i in 0..L {
-                (((self.alpha_score)[(self.num_labels) * (t) + (i)])) = 0.0;
+                ((self.alpha_score)[(self.num_labels) * (t) + (i)]) = 0.0;
             }
             for i in 0..L {
                 for j in 0..L {
-                    (((self.alpha_score)[(self.num_labels) * (t) + (j)])) += (((self.alpha_score)[(self.num_labels) * (t-1) + (0)])) * (((self.exp_trans)[(self.num_labels) * (i) + (j)]));
+                    ((self.alpha_score)[(self.num_labels) * (t) + (j)]) += ((self.alpha_score)
+                        [(self.num_labels) * (t - 1) + (0)])
+                        * ((self.exp_trans)[(self.num_labels) * (i) + (j)]);
                 }
             }
             for i in 0..L {
-                (((self.alpha_score)[(self.num_labels) * (t) + (i)])) *= (((self.exp_state)[(self.num_labels) * (t) + (i)]));
+                ((self.alpha_score)[(self.num_labels) * (t) + (i)]) *=
+                    ((self.exp_state)[(self.num_labels) * (t) + (i)]);
             }
             sum = 0.0;
             for i in 0..L {
-                sum += (((self.alpha_score)[(self.num_labels) * (t) + (i)]));
+                sum += ((self.alpha_score)[(self.num_labels) * (t) + (i)]);
             }
-            let scale = if sum != 0.0 { 1.0/sum } else { 1.0 };
+            let scale = if sum != 0.0 { 1.0 / sum } else { 1.0 };
             self.scale_factor.push(scale);
 
             for i in 0..L {
@@ -333,17 +337,17 @@ impl Crf1dContext {
         */
         self.log_norm = -self.scale_factor.iter().map(|&x| x.ln()).sum::<f64>();
     }
-    
+
     pub(crate) fn crf1dc_beta_score(&mut self) {
         let T = self.num_items;
         let L = self.num_labels;
 
         /* Compute the beta scores at (T-1, *). */
-        let mut scale_index = T-1;
+        let mut scale_index = T - 1;
         let scale = self.scale_factor[scale_index];
 
         for i in 0..L {
-            (self.beta_score)[(self.num_labels) * (T-1) + (i)] = scale;
+            (self.beta_score)[(self.num_labels) * (T - 1) + (i)] = scale;
         }
         if scale_index == 0 {
             return;
@@ -351,12 +355,12 @@ impl Crf1dContext {
         scale_index -= 1;
 
         /* Compute the beta scores at (t, *). */
-        for t in (0..T-1).rev() {
+        for t in (0..T - 1).rev() {
             for i in 0..L {
-                self.row[i] = (self.beta_score)[(self.num_labels) * (t+1) + (i)];
+                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)];
             }
             for i in 0..L {
-                self.row[i] *= (self.exp_state)[(self.num_labels) * (t+1) + (i)];
+                self.row[i] *= (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
             }
 
             /* Compute the beta score at (t, i). */
@@ -378,7 +382,7 @@ impl Crf1dContext {
             }
         }
     }
-    
+
     pub(crate) fn crf1dc_marginals(&mut self) {
         let L = self.num_labels;
         let T = self.num_items;
@@ -390,13 +394,15 @@ impl Crf1dContext {
         */
         for t in 0..T {
             for i in 0..L {
-                (self.mexp_state)[(self.num_labels) * (t) + (i)] = (self.alpha_score)[(self.num_labels) * (t) + (i)];
+                (self.mexp_state)[(self.num_labels) * (t) + (i)] =
+                    (self.alpha_score)[(self.num_labels) * (t) + (i)];
             }
             for i in 0..L {
-                (self.mexp_state)[(self.num_labels) * (t) + (i)] *= (self.beta_score)[(self.num_labels) * (t) + (i)];
+                (self.mexp_state)[(self.num_labels) * (t) + (i)] *=
+                    (self.beta_score)[(self.num_labels) * (t) + (i)];
             }
             for i in 0..L {
-                (self.mexp_state)[(self.num_labels) * (t) + (i)] *= 1.0/self.scale_factor[t];
+                (self.mexp_state)[(self.num_labels) * (t) + (i)] *= 1.0 / self.scale_factor[t];
             }
         }
 
@@ -409,23 +415,26 @@ impl Crf1dContext {
         The model expectation of a transition (i -> j) is the sum of the marginal
         probabilities p(t,i,t+1,j) over t.
         */
-        for t in 0..T-1 {
+        for t in 0..T - 1 {
             /* row[j] = state[t+1][j] * bwd'[t+1][j] */
             for i in 0..L {
-                self.row[i] = (self.beta_score)[(self.num_labels) * (t+1) + (i)];
+                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)];
             }
             for i in 0..L {
-                self.row[i] *= (self.exp_state)[(self.num_labels) * (t+1) + (i)];
+                self.row[i] *= (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
             }
 
             for i in 0..L {
                 for j in 0..L {
-                    (self.mexp_trans)[(self.num_labels) * (i) + (j)] += (self.alpha_score)[(self.num_labels) * (t) + (i)] * (self.exp_trans)[(self.num_labels) * (i) + (j)] * self.row[j];
+                    (self.mexp_trans)[(self.num_labels) * (i) + (j)] += (self.alpha_score)
+                        [(self.num_labels) * (t) + (i)]
+                        * (self.exp_trans)[(self.num_labels) * (i) + (j)]
+                        * self.row[j];
                 }
             }
         }
     }
-    
+
     pub(crate) fn crf1dc_score(&self, labels: &Vec<usize>) -> f64 {
         assert!(!labels.is_empty(), "empty labels");
         let L = self.num_labels;

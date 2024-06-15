@@ -1,5 +1,8 @@
-use std::{fs::File, io::{BufRead, BufReader}};
 use std::usize;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 use crate::quark::{Quark, TextVectorizer};
 
@@ -22,7 +25,12 @@ pub struct Sequence {
 
 impl Default for Sequence {
     fn default() -> Self {
-        Self { items: Default::default(), labels: Default::default(), weight: 1.0, group: Default::default() }
+        Self {
+            items: Default::default(),
+            labels: Default::default(),
+            weight: 1.0,
+            group: Default::default(),
+        }
     }
 }
 
@@ -60,7 +68,13 @@ impl Dataset {
             let line = line?;
             if !line.is_empty() {
                 if let Some((label, attrs)) = line.split_once('\t') {
-                    let item: Item = attrs.split('\t').map(|s| Attr { id: self.m_attrs.find_or_insert(s) as i32, value: 1.0 }).collect();
+                    let item: Item = attrs
+                        .split('\t')
+                        .map(|s| Attr {
+                            id: self.m_attrs.find_or_insert(s) as i32,
+                            value: 1.0,
+                        })
+                        .collect();
                     seq.push(item, self.m_labels.find_or_insert(&label));
                 } else {
                     log::warn!("invalid line: {line}");
@@ -86,7 +100,7 @@ impl Dataset {
     pub fn len(&self) -> usize {
         self.v.len()
     }
-    
+
     pub(crate) fn get(&self, i: usize) -> &Sequence {
         &self.v[i]
     }

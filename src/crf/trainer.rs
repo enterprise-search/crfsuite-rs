@@ -1,15 +1,9 @@
-use std::{collections::HashSet, ffi::CStr, hash::Hash, mem::MaybeUninit, path::PathBuf, time::Instant};
-
-use clap::Parser;
-use libc::c_void;
-use liblbfgs_sys::{
-    lbfgs, lbfgs_free, lbfgs_malloc, lbfgs_parameter_init, lbfgs_parameter_t, lbfgs_strerror,
-    LBFGS_LINESEARCH_MORETHUENTE,
+use super::crf1d::{
+    context::{Crf1dContext, Opt},
+    model::FeatRefs,
 };
-
-use crate::{crf::crf1d::context::ResetOpt, Algorithm, Dataset, Sequence};
-
-use super::crf1d::{context::{Crf1dContext, Opt}, model::FeatRefs};
+use crate::{crf::crf1d::context::ResetOpt, Dataset, Sequence};
+use std::{collections::HashSet, hash::Hash, path::PathBuf, time::Instant};
 
 #[derive(Debug, Default)]
 struct Feat {
@@ -33,9 +27,7 @@ impl PartialEq for Feat {
     }
 }
 
-impl Eq for Feat {
-    
-}
+impl Eq for Feat {}
 
 #[derive(Debug, Default)]
 struct Crf1deOpt {
@@ -57,11 +49,11 @@ impl Crf1de {
     pub fn num_labels(&self) -> usize {
         self.forward_trans.len()
     }
-    
+
     fn num_features(&self) -> usize {
         self.features.len()
     }
-    
+
     fn set_data(&mut self, ds: &Dataset) {
         let L = ds.num_labels();
         let A = ds.num_attrs();
@@ -71,14 +63,19 @@ impl Crf1de {
         self.ctx = Crf1dContext::new(&[Opt::CTXF_VITERBI, Opt::CTXF_MARGINALS], L, T);
         log::info!("TODO: opts info");
         let begin = Instant::now();
-        self.features = crf1df_generate(ds, self.opt.feature_possible_states, self.opt.feature_possible_transitions, self.opt.feature_minfreq);
+        self.features = crf1df_generate(
+            ds,
+            self.opt.feature_possible_states,
+            self.opt.feature_possible_transitions,
+            self.opt.feature_minfreq,
+        );
         log::info!("number of features: {}", self.features.len());
         log::info!("took: {:?}", begin.elapsed());
         self.attrs.resize(A, FeatRefs::default());
         self.forward_trans.resize(L, FeatRefs::default());
         crf1df_init_references(&mut self.attrs, &mut self.forward_trans, &self.features);
     }
-    
+
     fn state_score(&mut self, seq: &crate::Sequence, w: *const f64) {
         let L = self.num_labels();
         let T = seq.len();
@@ -96,22 +93,24 @@ impl Crf1de {
                 for fid in attr_feat_refs {
                     /* State feature associates the attribute #a with the label #(f->dst). */
                     let f = &self.features[*fid];
-                    self.ctx.state[self.ctx.num_labels * (t) + f.dst as usize] += unsafe { *w.offset(*fid as isize) } * attr.value;
+                    self.ctx.state[self.ctx.num_labels * (t) + f.dst as usize] +=
+                        unsafe { *w.offset(*fid as isize) } * attr.value;
                 }
             }
         }
     }
-    
+
     fn transition_score(&mut self, w: *const f64) {
         let L = self.num_labels();
         for i in 0..L {
             let edge = &self.forward_trans[i];
             for fid in edge {
-                self.ctx.trans[self.ctx.num_labels * i + self.features[*fid].dst as usize] = unsafe { *w.offset(*fid as isize) }
+                self.ctx.trans[self.ctx.num_labels * i + self.features[*fid].dst as usize] =
+                    unsafe { *w.offset(*fid as isize) }
             }
         }
     }
-    
+
     fn model_expectation(&self, seq: &Sequence, w: *mut f64, weight: f64) {
         let T = seq.len();
         let L = self.num_labels();
@@ -128,9 +127,13 @@ impl Crf1de {
                     /* Loop over state features for the attribute. */
                     for fid in attr_feat_refs {
                         let f = &self.features[*fid];
-                        unsafe { *w.offset(*fid as isize) += (self.ctx.mexp_state)[(self.ctx.num_labels) * (t) + (f.dst as usize)] * attr.value * weight };
+                        unsafe {
+                            *w.offset(*fid as isize) += (self.ctx.mexp_state)
+                                [(self.ctx.num_labels) * (t) + (f.dst as usize)]
+                                * attr.value
+                                * weight
+                        };
                     }
-
                 }
             }
         }
@@ -140,7 +143,11 @@ impl Crf1de {
             let edge = &self.forward_trans[i];
             for fid in edge {
                 let f = &self.features[*fid];
-                unsafe { *w.offset(*fid as isize) += (self.ctx.mexp_trans)[(self.ctx.num_labels) * (i) + (f.dst as usize)] * weight };
+                unsafe {
+                    *w.offset(*fid as isize) += (self.ctx.mexp_trans)
+                        [(self.ctx.num_labels) * (i) + (f.dst as usize)]
+                        * weight
+                };
             }
         }
     }
@@ -170,7 +177,11 @@ impl FeatSet {
     }
 }
 
-fn crf1df_init_references(attrs: &mut Vec<Vec<usize>>, forward_trans: &mut Vec<Vec<usize>>, features: &Vec<Feat>) {
+fn crf1df_init_references(
+    attrs: &mut Vec<Vec<usize>>,
+    forward_trans: &mut Vec<Vec<usize>>,
+    features: &Vec<Feat>,
+) {
     let K = features.len();
     let A = attrs.len();
     let L = forward_trans.len();
@@ -186,11 +197,11 @@ fn crf1df_init_references(attrs: &mut Vec<Vec<usize>>, forward_trans: &mut Vec<V
         match f.ftype {
             FT_STATE => {
                 attrs[f.src as usize].push(k);
-            },
+            }
             FT_TRANS => {
                 forward_trans[f.src as usize].push(k);
-            },
-            _ => panic!("unexpected feature type")
+            }
+            _ => panic!("unexpected feature type"),
         }
     }
 }
@@ -198,7 +209,12 @@ fn crf1df_init_references(attrs: &mut Vec<Vec<usize>>, forward_trans: &mut Vec<V
 const FT_STATE: u32 = 0;
 const FT_TRANS: u32 = 1;
 
-fn crf1df_generate(ds: &Dataset, connect_all_attrs: bool, connect_all_edges: bool, feature_min_freq: f64) -> Vec<Feat> {
+fn crf1df_generate(
+    ds: &Dataset,
+    connect_all_attrs: bool,
+    connect_all_edges: bool,
+    feature_min_freq: f64,
+) -> Vec<Feat> {
     let N = ds.len();
     let L = ds.num_labels();
     log::info!("start generate: N: {N}, L: {L}");
@@ -217,37 +233,57 @@ fn crf1df_generate(ds: &Dataset, connect_all_attrs: bool, connect_all_edges: boo
             curr = seq.labels[t];
 
             /* Transition feature: label #prev -> label #(item->yid).
-               Features with previous label #L are transition BOS. */
-               if prev != L {
-                set.add(Feat { ftype: FT_TRANS, src: prev as u32, dst: curr as u32, freq: seq.weight })
-               }
+            Features with previous label #L are transition BOS. */
+            if prev != L {
+                set.add(Feat {
+                    ftype: FT_TRANS,
+                    src: prev as u32,
+                    dst: curr as u32,
+                    freq: seq.weight,
+                })
+            }
 
-               for attr in item {
+            for attr in item {
                 /* State feature: attribute #a -> state #(item->yid). */
-                set.add(Feat { ftype: FT_STATE, src: attr.id as u32, dst: curr as u32, freq: seq.weight * attr.value });
+                set.add(Feat {
+                    ftype: FT_STATE,
+                    src: attr.id as u32,
+                    dst: curr as u32,
+                    freq: seq.weight * attr.value,
+                });
 
                 /* Generate state features connecting attributes with all
-                   output labels. These features are not unobserved in the
-                   training data (zero expexcations). */
-                   if connect_all_attrs {
+                output labels. These features are not unobserved in the
+                training data (zero expexcations). */
+                if connect_all_attrs {
                     for i in 0..L {
-                        set.add(Feat { ftype: FT_STATE, src: attr.id as u32, dst: i as u32, freq: 0.0 });
+                        set.add(Feat {
+                            ftype: FT_STATE,
+                            src: attr.id as u32,
+                            dst: i as u32,
+                            freq: 0.0,
+                        });
                     }
-                   }
-               }
+                }
+            }
 
-               prev = curr;
+            prev = curr;
         }
         // log::info!("progress: {s}/{N}");
     }
     log::info!("finished {}", set.m.len());
     /* Generate edge features representing all pairs of labels.
-       These features are not unobserved in the training data
-       (zero expexcations). */
+    These features are not unobserved in the training data
+    (zero expexcations). */
     if connect_all_edges {
         for i in 0..L {
             for j in 0..L {
-                set.add(Feat { ftype: FT_TRANS, src: i as u32, dst: j as u32, freq: 0.0 });
+                set.add(Feat {
+                    ftype: FT_TRANS,
+                    src: i as u32,
+                    dst: j as u32,
+                    freq: 0.0,
+                });
             }
         }
     }
@@ -261,16 +297,22 @@ pub struct TagEncoder {
 
 impl TagEncoder {
     pub fn new() -> Self {
-        Self { internal: Crf1de::default() }
+        Self {
+            internal: Crf1de::default(),
+        }
     }
-    
+
     /* LEVEL_NONE -> LEVEL_NONE. */
-    pub(crate) fn objective_and_gradients_batch(&mut self, ds: &Dataset, w: *const f64, g: *mut f64) -> f64 {   
-        log::error!("LEN: {}", ds.len())     ;
+    pub(crate) fn objective_and_gradients_batch(
+        &mut self,
+        ds: &Dataset,
+        w: *const f64,
+        g: *mut f64,
+    ) -> f64 {
         let N = ds.len();
         let K = self.internal.num_features();
 
-        /// Initialize the gradients with observation expectations.
+        // Initialize the gradients with observation expectations.
         for i in 0..K {
             unsafe { *g.offset(i as isize) = -self.internal.features[i].freq };
         }
@@ -283,7 +325,7 @@ impl TagEncoder {
         self.internal.transition_score(w);
         self.internal.ctx.crf1dc_exp_transition();
 
-        /// Compute model expectations.
+        // Compute model expectations.
         let mut logp = 0.0;
         let mut logl = 0.0;
         for seq in &ds.v {
@@ -308,11 +350,11 @@ impl TagEncoder {
         }
         -logl
     }
-    
+
     pub fn num_features(&self) -> usize {
         self.internal.num_features()
     }
-    
+
     pub(crate) fn set_data(&mut self, ds: &Dataset) {
         self.internal.set_data(ds);
     }

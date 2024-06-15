@@ -1,11 +1,18 @@
 use std::fs::File;
 
-use crfsuite::{crf::{lbfgs::{self, Lbfgs}, trainer::{Crf1dTrainer, TagEncoder}}, Dataset};
-
+use crfsuite::{
+    crf::{
+        lbfgs::{self, Lbfgs},
+        trainer::{Crf1dTrainer, TagEncoder},
+    },
+    Dataset,
+};
 
 #[test]
 fn train() {
-    env_logger::builder().filter_level(log::LevelFilter::Debug).init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
     let input = File::open("test.data").expect("failed to open file");
     let mut ds = Dataset::default();
     ds.read_file(input).expect("failed to read input file");
