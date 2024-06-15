@@ -1,6 +1,8 @@
 use std::{fs::File, io::{BufRead, BufReader}};
 use std::usize;
 
+use crate::quark::{Quark, TextVectorizer};
+
 pub type Item = Vec<Attr>;
 
 #[repr(C)]
@@ -14,7 +16,7 @@ pub struct Attr {
 pub struct Sequence {
     pub items: Vec<Item>,
     pub labels: Vec<usize>,
-    weight: f64,
+    pub weight: f64,
     group: usize,
 }
 
@@ -47,19 +49,19 @@ impl Sequence {
 #[derive(Debug, Default)]
 pub struct Dataset {
     pub v: Vec<Sequence>,
-    pub n_labels: usize,
-    pub n_attrs: usize,
+    m_labels: Quark,
+    m_attrs: Quark,
 }
 
 impl Dataset {
-    pub fn read_file<AttrToId: FnMut(&str) -> usize, LabelToId: FnMut(&str) -> usize>(&mut self, file: File, mut attr_to_id: AttrToId, mut label_to_id: LabelToId) -> Result<(), std::io::Error> {
+    pub fn read_file(&mut self, file: File) -> Result<(), std::io::Error> {
         let mut seq = Sequence::default();
         for line in BufReader::new(file).lines() {
             let line = line?;
             if !line.is_empty() {
                 if let Some((label, attrs)) = line.split_once('\t') {
-                    let item: Item = attrs.split('\t').map(|s| Attr { id: attr_to_id(s) as i32, value: 1.0 }).collect();
-                    seq.push(item, label_to_id(&label));
+                    let item: Item = attrs.split('\t').map(|s| Attr { id: self.m_attrs.find_or_insert(s) as i32, value: 1.0 }).collect();
+                    seq.push(item, self.m_labels.find_or_insert(&label));
                 } else {
                     log::warn!("invalid line: {line}");
                 }
@@ -73,11 +75,27 @@ impl Dataset {
         Ok(())
     }
 
-    pub fn max_length(&self) -> usize {
+    pub fn max_seq_length(&self) -> usize {
         self.v.iter().map(|x| x.len()).max().unwrap_or_default()
     }
 
     pub fn total_items(&self) -> usize {
         self.v.iter().map(|x| x.len()).sum()
+    }
+
+    pub fn len(&self) -> usize {
+        self.v.len()
+    }
+    
+    pub(crate) fn get(&self, i: usize) -> &Sequence {
+        &self.v[i]
+    }
+
+    pub fn num_labels(&self) -> usize {
+        self.m_labels.len()
+    }
+
+    pub fn num_attrs(&self) -> usize {
+        self.m_attrs.len()
     }
 }

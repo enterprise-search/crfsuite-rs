@@ -9,7 +9,7 @@ use crate::{crf::model::Model, quark::{Quark, StringTable}};
 
 use super::tagger::Crf1dTagger;
 
-type FeatRefs = Vec<usize>;
+pub type FeatRefs = Vec<usize>;
 
 #[derive(Debug)]
 pub enum FeatCat {}
