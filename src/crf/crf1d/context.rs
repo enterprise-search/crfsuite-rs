@@ -268,4 +268,8 @@ impl Crf1dContext {
         /* Return the maximum score (without the normalization factor subtracted). */
         max_score
     }
+    
+    pub(crate) fn crf1dc_lognorm(&self) -> f64 {
+        self.log_norm
+    }
 }
