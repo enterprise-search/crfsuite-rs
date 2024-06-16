@@ -480,7 +480,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_crf1dc_set_num_items(b: &mut Bencher) {
+    fn bench_resize(b: &mut Bencher) {
         b.iter(|| {
             let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
             for i in 1..100 {
@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_crf1dc_alpha_score(b: &mut Bencher) {
+    fn bench_alpha_score(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.resize(127);
         b.iter(|| {
@@ -499,7 +499,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_crf1dc_beta_score(b: &mut Bencher) {
+    fn bench_beta_score(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.resize(127);
         b.iter(|| {
@@ -508,7 +508,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_crf1dc_marginals(b: &mut Bencher) {
+    fn bench_marginals(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.resize(127);
         b.iter(|| {
