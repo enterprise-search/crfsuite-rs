@@ -327,7 +327,7 @@ impl TagEncoder {
         // Compute model expectations.
         let mut logp = 0.0;
         let mut logl = 0.0;
-        for seq in &ds.v {
+        for seq in &ds.seqs {
             /* Set label sequences and state scores. */
             self.internal.ctx.crf1dc_set_num_items(seq.len());
             self.internal.ctx.reset(&[ResetOpt::RF_STATE]);

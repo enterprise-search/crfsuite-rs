@@ -61,7 +61,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn find_by_str() {
+    fn find_or_insert() {
         let mut quark = Quark::default();
         for (s, id) in [("zero", 0), ("one", 1), ("two", 2), ("three", 3), ("two", 2), ("one", 1), ("zero", 0), ("four", 4)] {
             assert_eq!(id, quark.find_or_insert(s), "{} != {}", s, id);

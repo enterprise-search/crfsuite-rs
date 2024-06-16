@@ -1,18 +1,13 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader},
-    iter::zip, time::Duration,
+    iter::zip,
+    time::Duration,
 };
 
-use crfsuite::{
-    crf::{data::Instance, tagger::Tagger}, quark::StringTable, Evaluation
-};
+use crfsuite::{crf::tagger::Tagger, dataset::Attr, quark::StringTable, Evaluation};
 
-use crfsuite::crf::{
-    crf1d::model::Crf1dModel,
-    data::{Attr, Item},
-    model::Model,
-};
+use crfsuite::crf::{crf1d::model::Crf1dModel, model::Model};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn predict(tagger: &mut dyn Tagger, dataset: &Vec<Instance>) {
@@ -57,7 +52,7 @@ fn pred_benchmark(c: &mut Criterion) {
                     .split('\t')
                     .map(|s| m_attrs.to_id(s))
                     .flatten()
-                    .map(|i| Attr::new(i, 1.0))
+                    .map(|i| Attr { id: i as i32, value: 1.0 })
                     .collect();
                 instance.append(item, m_labels.to_id(label).unwrap_or(labels.len()));
                 labels.push(label.to_string());

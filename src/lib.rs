@@ -212,8 +212,6 @@ impl FromStr for GraphicalModel {
 /// to various graphical models and training algorithms.
 #[derive(Debug)]
 pub struct Trainer {
-    // m_attrs: Quark,
-    // m_labels: Quark,
     data: *mut crfsuite_data_t,
     trainer: *mut crfsuite_trainer_t,
     #[allow(dead_code)]
@@ -264,9 +262,7 @@ impl Trainer {
             Self {
                 data: data_ptr,
                 trainer: ptr::null_mut(),
-                verbose,
-                // m_attrs: Quark::default(),
-                // m_labels: Quark::default(),
+                verbose,                
             }
         }
     }
@@ -369,11 +365,7 @@ impl Trainer {
                     let aid = (*(*self.data).attrs)
                         .get
                         .map(|f| f((*self.data).attrs, name_cstr.as_ptr()))
-                        .unwrap();
-                    // let aid2 = self.m_attrs.find_or_insert(&item.name) as i32;
-                    // if aid != aid2 {
-                    //     log::error!("not eq for attr: {} aid: {} aid2: {}", item.name, aid, aid2);
-                    // }
+                        .unwrap();                    
                     (*content).aid = aid;
                     (*content).value = item.value;
                 }
@@ -383,11 +375,7 @@ impl Trainer {
                 let label = (*(*self.data).labels)
                     .get
                     .map(|f| f((*self.data).labels, y_cstr.as_ptr()))
-                    .unwrap();
-                // let label2 = self.m_labels.find_or_insert(yseq[t].as_ref()) as i32;
-                // if label != label2 {
-                //     log::error!("not eq for label: {}, orig: {}, new: {}", yseq[t].as_ref(), label, label2);
-                // }
+                    .unwrap();                
                 crf_labels[t] = label;
             }
             instance.group = group;

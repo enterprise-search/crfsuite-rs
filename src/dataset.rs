@@ -59,7 +59,7 @@ impl Sequence {
 
 #[derive(Debug, Default)]
 pub struct Dataset {
-    pub v: Vec<Sequence>,
+    pub seqs: Vec<Sequence>,
     m_labels: Quark,
     m_attrs: Quark,
 }
@@ -91,7 +91,7 @@ impl From<Lines<'_>> for Dataset {
                 }
             }
         }
-        Self { v, m_labels, m_attrs }
+        Self { seqs: v, m_labels, m_attrs }
     }
 }
 
@@ -99,7 +99,33 @@ impl TryFrom<File> for Dataset {
     type Error = std::io::Error;
     
     fn try_from(value: File) -> Result<Self, Self::Error> {
-       todo!()
+        let mut seq = Sequence::default();
+        let mut m_labels = Quark::default();
+        let mut m_attrs = Quark::default();
+        let mut v = Vec::new();
+        for line in BufReader::new(value).lines() {
+            let line = line?;
+            if !line.is_empty() {
+                if let Some((label, attrs)) = line.split_once('\t') {
+                    let item: Item = attrs
+                        .split('\t')
+                        .map(|s| Attr {
+                            id: m_attrs.find_or_insert(s) as i32,
+                            value: 1.0,
+                        })
+                        .collect();
+                    seq.push(item, m_labels.find_or_insert(&label));
+                } else {
+                    log::warn!("invalid line: {line}");
+                }
+            } else {
+                if !(seq.is_empty()) {
+                    v.push(seq);
+                    seq = Sequence::default();
+                }
+            }
+        }
+        Ok(Self { seqs: v, m_labels, m_attrs })
     }
 }
 
@@ -123,7 +149,7 @@ impl Dataset {
                 }
             } else {
                 if !(seq.is_empty()) {
-                    self.v.push(seq);
+                    self.seqs.push(seq);
                     seq = Sequence::default();
                 }
             }
@@ -132,19 +158,19 @@ impl Dataset {
     }
 
     pub fn max_seq_length(&self) -> usize {
-        self.v.iter().map(|x| x.len()).max().unwrap_or_default()
+        self.seqs.iter().map(|x| x.len()).max().unwrap_or_default()
     }
 
     pub fn total_items(&self) -> usize {
-        self.v.iter().map(|x| x.len()).sum()
+        self.seqs.iter().map(|x| x.len()).sum()
     }
 
     pub fn len(&self) -> usize {
-        self.v.len()
+        self.seqs.len()
     }
 
     pub(crate) fn get(&self, i: usize) -> &Sequence {
-        &self.v[i]
+        &self.seqs[i]
     }
 
     pub fn num_labels(&self) -> usize {
