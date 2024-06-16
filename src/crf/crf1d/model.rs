@@ -1,4 +1,4 @@
-use std::{convert::TryInto, ffi::CStr, fs::File, io::Write, path::PathBuf};
+use std::{convert::TryInto, ffi::CStr, fs::File, path::PathBuf};
 
 use cqdb::CQDB;
 use crfsuite_sys::crfsuite_dictionary_t;
@@ -390,7 +390,9 @@ impl Model for Crf1dModel {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
+    use std::{io::{BufReader, BufWriter}, time::Instant};
+
+    use test::Bencher;
 
     use super::*;
 
@@ -415,4 +417,49 @@ mod tests {
         let model = Crf1dModel::from_path(path.into());
         model.dump();
     }
+
+    #[test]
+    fn serde() {
+        let fpath = "ner.json";
+        let f = File::open(fpath).expect("failed to open file");
+        let t:T = serde_json::from_reader(f).expect("failed to read model");
+        let ofpath = "ner.bson";
+        let v = bson::to_vec(&t).expect("failed to serialize with bson");
+        let mut f = File::create(ofpath).expect("failed to create model file");
+        f.write(&v).expect("failed to write model file");
+    }
+
+    #[bench]
+    fn bench_model_read_bson(b: &mut Bencher) {
+        let fpath = "ner.bson";
+        //    10,587,554.20
+        b.iter(|| {
+            let f = File::open(fpath).expect("failed to open file");
+            let t:T = bson::from_reader(f).expect("failed to read model");
+        });
+    }
+
+    #[bench]
+    fn bench_model_read_json(b: &mut Bencher) {
+        let fpath = "ner.json";
+        //    15,764,570.80 ns/iter
+        b.iter(|| {
+            let f = File::open(fpath).expect("failed to open file");
+            let t:T = serde_json::from_reader(BufReader::new(f)).expect("failed to read model");
+        });
+    }
+
+    #[bench]
+    fn bench_model_write_bson(b: &mut Bencher) {
+        let fpath = "ner.bson";
+        let f = File::open(fpath).expect("failed to open file");
+        let t:T = bson::from_reader(f).expect("failed to read model");
+        //     4,633,483.30
+        b.iter(|| {
+            let ofpath = "ner.bson";
+            let v = bson::to_vec(&t).expect("failed to serialize with bson");
+            let mut f = File::create(ofpath).expect("failed to create model file");
+            f.write(&v).expect("failed to write model file");
+        });
+    }    
 }
