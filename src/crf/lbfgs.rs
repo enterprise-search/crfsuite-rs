@@ -8,12 +8,12 @@ use liblbfgs_sys::{
 
 use crate::Dataset;
 
-use super::trainer::TagEncoder;
+use super::trainer::{Crf1dEncoder, Encoder};
 
 #[repr(C)]
 #[derive(Debug)]
 struct Ctx {
-    encoder: TagEncoder,
+    encoder: Crf1dEncoder,
     c2: f64,
     trainset: *const Dataset,
     best_w: Vec<f64>,
@@ -21,7 +21,7 @@ struct Ctx {
 }
 
 impl Ctx {
-    pub fn new(encoder: TagEncoder, trainset: *const Dataset) -> Self {
+    pub fn new(encoder: Crf1dEncoder, trainset: *const Dataset) -> Self {
         Self {
             c2: 0.1,
             trainset,
@@ -30,14 +30,6 @@ impl Ctx {
             timestamp: Instant::now(),
         }
     }
-}
-
-#[derive(Debug)]
-pub struct Lbfgs {
-    encoder: TagEncoder,
-    c2: f64,
-    trainset: *const Dataset,
-    best_w: Vec<f64>,
 }
 
 #[derive(Debug, Parser)]
@@ -69,9 +61,7 @@ unsafe extern "C" fn proc_evaluate(
     n: i32,
     step: f64,
 ) -> f64 {
-    log::debug!("evaluate step: {step}, inst: {:?}", instance);
     let this = (instance as *mut Ctx).as_mut().expect("null instance");
-    log::debug!("ctx c2: {:?}, best_w.len: {}", this.c2, this.best_w.len());
     let trainset = this.trainset.as_ref().expect("null dataset");
 
     let n = n as usize;
@@ -126,7 +116,7 @@ unsafe extern "C" fn proc_progress(
     }
 
     /* Report the progress. */
-    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials/step: {ls}/{step}, took: {elapsed:?})");
+    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials/step: {ls}/{step:4}, took: {elapsed:?})");
 
     /* Send the tagger with the current parameters. */
     // TODO
@@ -135,7 +125,7 @@ unsafe extern "C" fn proc_progress(
     0
 }
 
-pub fn train(mut encoder: TagEncoder, ds: &Dataset, fpath: PathBuf, holdout: usize) {
+pub fn train(mut encoder: Crf1dEncoder, ds: &Dataset, fpath: PathBuf, holdout: usize) {
     let N = ds.len();
     let L = ds.num_labels();
     let A = ds.num_attrs();

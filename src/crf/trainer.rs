@@ -57,7 +57,7 @@ struct Crf1deOpt {
 }
 
 #[derive(Debug, Default)]
-struct Crf1de {
+pub struct Crf1dEncoder {
     opt: Crf1deOpt,
     features: Vec<Feat>,
     attrs: Vec<FeatRefs>,
@@ -65,40 +65,15 @@ struct Crf1de {
     ctx: Crf1dContext,
 }
 
-impl Crf1de {
+impl Crf1dEncoder {
+    // #[inline]
     pub fn num_labels(&self) -> usize {
         self.forward_trans.len()
     }
 
-    fn num_features(&self) -> usize {
+    // #[inline]
+    pub(crate) fn num_features(&self) -> usize {
         self.features.len()
-    }
-
-    fn set_data(&mut self, ds: &Dataset) {
-        let L = ds.num_labels();
-        let A = ds.num_attrs();
-        let N = ds.len();
-        let T = ds.max_seq_length();
-        log::info!("set data (L: {L}, A: {A}, N: {N}, T: {T})");
-        self.ctx = Crf1dContext::new(CtxOpt::CTXF_VITERBI | CtxOpt::CTXF_MARGINALS, L, T);
-        log::info!("TODO: opts info");
-        log::info!("feature generation (type: crf1d, min_freq: {}, possible_states: {}, possible_transitions: {}", self.opt.feature_minfreq, self.opt.feature_possible_states, self.opt.feature_possible_transitions);
-        let begin = Instant::now();
-        self.opt.feature_possible_transitions = true;
-        self.features = crf1df_generate(
-            ds,
-            self.opt.feature_possible_states,
-            self.opt.feature_possible_transitions,
-            self.opt.feature_minfreq,
-        );
-        log::info!(
-            "number of features: {}, time cost: {:?}",
-            self.features.len(),
-            begin.elapsed()
-        );
-        self.attrs.resize(A, FeatRefs::default());
-        self.forward_trans.resize(L, FeatRefs::default());
-        crf1df_init_references(&mut self.attrs, &mut self.forward_trans, &self.features);
     }
 
     fn state_score(&mut self, seq: &crate::Sequence, w: &[f64]) {
@@ -197,13 +172,14 @@ fn crf1df_init_references(
         - transition features pointing from each label (trans)
     */
     // for k in 0..K {
-        // let f = &features[k];
-    features.iter().enumerate().for_each(|(k, f)| {
-        match &f.ftype {
+    // let f = &features[k];
+    features
+        .iter()
+        .enumerate()
+        .for_each(|(k, f)| match &f.ftype {
             FeatType::FT_STATE => attrs[f.src as usize].push(k),
             FeatType::FT_TRANS => forward_trans[f.src as usize].push(k),
-        }
-    });
+        });
 }
 
 fn crf1df_generate(
@@ -281,72 +257,85 @@ fn crf1df_generate(
     set.to_vec(feature_min_freq)
 }
 
-#[derive(Debug)]
-pub struct TagEncoder {
-    internal: Crf1de,
+/**
+ * Interface for a graphical model.
+ */
+pub(crate) trait Encoder {
+    /// initializes the encoder with a training data set
+    fn set_data(&mut self, ds: &Dataset);
+    /// compute the objective value and gradients for the whole data set.
+    fn objective_and_gradients_batch(&mut self, ds: &Dataset, w: &[f64], g: &mut [f64]) -> f64;
 }
 
-impl TagEncoder {
-    pub fn new() -> Self {
-        Self {
-            internal: Crf1de::default(),
-        }
+impl Encoder for Crf1dEncoder {
+    fn set_data(&mut self, ds: &Dataset) {
+        let L = ds.num_labels();
+        let A = ds.num_attrs();
+        let N = ds.len();
+        let T = ds.max_seq_length();
+        log::info!("set data (L: {L}, A: {A}, N: {N}, T: {T})");
+        self.ctx = Crf1dContext::new(CtxOpt::CTXF_VITERBI | CtxOpt::CTXF_MARGINALS, L, T);
+        log::info!("TODO: opts info");
+        log::info!("feature generation (type: crf1d, min_freq: {}, possible_states: {}, possible_transitions: {}", self.opt.feature_minfreq, self.opt.feature_possible_states, self.opt.feature_possible_transitions);
+        let begin = Instant::now();
+        self.opt.feature_possible_transitions = true;
+        self.features = crf1df_generate(
+            ds,
+            self.opt.feature_possible_states,
+            self.opt.feature_possible_transitions,
+            self.opt.feature_minfreq,
+        );
+        log::info!(
+            "number of features: {}, time cost: {:?}",
+            self.features.len(),
+            begin.elapsed()
+        );
+        self.attrs.resize(A, FeatRefs::default());
+        self.forward_trans.resize(L, FeatRefs::default());
+        crf1df_init_references(&mut self.attrs, &mut self.forward_trans, &self.features);
     }
 
     /* LEVEL_NONE -> LEVEL_NONE. */
-    pub(crate) fn objective_and_gradients_batch(
-        &mut self,
-        ds: &Dataset,
-        w: &[f64],
-        g: &mut [f64],
-    ) -> f64 {
+    fn objective_and_gradients_batch(&mut self, ds: &Dataset, w: &[f64], g: &mut [f64]) -> f64 {
         let N = ds.len();
-        let K = self.internal.num_features();
+        let K = self.num_features();
 
         // Initialize the gradients with observation expectations.
         for i in 0..K {
-            g[i] = -self.internal.features[i].freq;
+            g[i] = -self.features[i].freq;
         }
 
         /*
         Set the scores (weights) of transition features here because
         these are independent of input label sequences.
         */
-        self.internal.ctx.reset(ResetOpt::RF_TRANS);
-        self.internal.transition_score(w);
-        self.internal.ctx.exp_transition();
+        self.ctx.reset(ResetOpt::RF_TRANS);
+        self.transition_score(w);
+        self.ctx.exp_transition();
 
         // Compute model expectations.
         let mut logl = 0.0;
         for seq in &ds.seqs {
             /* Set label sequences and state scores. */
-            self.internal.ctx.resize(seq.len());
-            self.internal.ctx.reset(ResetOpt::RF_STATE);
-            self.internal.state_score(seq, w);
-            self.internal.ctx.exp_state();
+            self.ctx.resize(seq.len());
+            self.ctx.reset(ResetOpt::RF_STATE);
+            self.state_score(seq, w);
+            self.ctx.exp_state();
 
             /* Compute forward/backward scores. */
-            self.internal.ctx.alpha_score();
-            self.internal.ctx.beta_score();
-            self.internal.ctx.marginals();
+            self.ctx.alpha_score();
+            self.ctx.beta_score();
+            self.ctx.marginals();
 
             /* Compute the probability of the input sequence on the model. */
-            let logp = self.internal.ctx.score(&seq.labels) - self.internal.ctx.lognorm();
+            let logp = self.ctx.score(&seq.labels) - self.ctx.lognorm();
             /* Update the log-likelihood. */
             logl += logp * seq.weight;
 
             /* Update the model expectations of features. */
-            self.internal.model_expectation(seq, g, seq.weight);
+            self.model_expectation(seq, g, seq.weight);
         }
         -logl
-    }
-
-    pub fn num_features(&self) -> usize {
-        self.internal.num_features()
-    }
-
-    pub(crate) fn set_data(&mut self, ds: &Dataset) {
-        self.internal.set_data(ds);
     }
 }
 
@@ -364,7 +353,7 @@ mod tests {
 
     #[test]
     fn set_data() {
-        let mut o = Crf1de::default();
+        let mut o = Crf1dEncoder::default();
         assert_eq!(o.num_features(), 0);
         assert_eq!(o.num_labels(), 0);
         let s = "P\thello\tworld
@@ -399,7 +388,7 @@ mod tests {
         let yseq = [
             "sunny", "sunny", "sunny", "rainy", "rainy", "rainy", "sunny", "sunny", "rainy",
         ];
-        let o = TagEncoder::new();
+        let o = Crf1dEncoder::default();
     }
 
     #[test]
@@ -436,5 +425,4 @@ mod tests {
             crf1df_init_references(&mut attrs, &mut trans, &feats);
         });
     }
-    
 }
