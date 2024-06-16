@@ -11,7 +11,7 @@ fn train(fpath: &Path) {
     let parameters = vec![
         "c1=0.1",
         "c2=0.1",
-        "max_iterations=30",
+        "max_iterations=100",
         "feature.possible_transitions=1",
     ];
     parameters.iter().for_each(|s| {

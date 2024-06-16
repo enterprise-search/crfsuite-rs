@@ -25,11 +25,11 @@ impl<'a> Crf1dTagger<'a> {
     pub fn new(model: &'a Crf1dModel) -> Self {
         let L = model.num_labels();
         let mut ctx = Crf1dContext::new(
-            &[context::Opt::CTXF_VITERBI, context::Opt::CTXF_MARGINALS],
+            context::CtxOpt::CTXF_VITERBI | context::CtxOpt::CTXF_MARGINALS,
             L,
             0,
         );
-        ctx.reset(&[context::ResetOpt::RF_TRANS]);
+        ctx.reset(context::ResetOpt::RF_TRANS);
         {
             /* Compute transition scores between two labels. */
             for i in 0..L {
@@ -63,7 +63,7 @@ impl<'a> Tagger for Crf1dTagger<'a> {
     fn set_seq(&mut self, instance: &Sequence) {
         let T = instance.len();
         self.ctx.crf1dc_set_num_items(T);
-        self.ctx.reset(&[ResetOpt::RF_STATE]);
+        self.ctx.reset(ResetOpt::RF_STATE);
 
         /* Loop over the items in the sequence. */
         for (i, item) in instance.items.iter().enumerate() {

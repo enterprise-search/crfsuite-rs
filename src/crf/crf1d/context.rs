@@ -1,25 +1,38 @@
-use std::{iter::zip, ops::Sub};
 
-use libc::size_t;
+use bitflags::bitflags;
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Opt {
-    CTXF_VITERBI = 0x01,
-    CTXF_MARGINALS = 0x02,
-    CTXF_ALL = 0xFF,
+#[derive(Debug)]
+pub(crate) struct CtxOpt(u32);
+
+bitflags! {
+    impl CtxOpt: u32 {
+        const CTXF_VITERBI = 0x01;
+        const CTXF_MARGINALS = 0x02;
+        const CTXF_ALL = 0xFF;
+    }
+}
+
+impl Default for CtxOpt {
+    fn default() -> Self {
+        Self::CTXF_VITERBI
+    }
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum ResetOpt {
-    RF_STATE = 0x01,
-    RF_TRANS = 0x02,
-    RF_ALL = 0xFF,
+pub(crate) struct ResetOpt(u32);
+
+bitflags! {
+    impl ResetOpt : u32 {
+        const RF_STATE = 0x01;
+        const RF_TRANS = 0x02;
+        const RF_ALL = 0xFF;
+    }
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Crf1dContext {
     /// Flag specifying the functionality.
-    flag: Vec<Opt>,
+    flag: CtxOpt,
     /**
      * The total number of distinct labels (L).
      */
@@ -122,18 +135,17 @@ pub(crate) struct Crf1dContext {
 }
 
 impl Crf1dContext {
-    pub fn new(flag: &[Opt], L: usize, T: usize) -> Self {
+    pub fn new(flag: CtxOpt, L: usize, T: usize) -> Self {
+        let exp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) { vec![0.0; L*L] } else { Vec::new() };
+        let mexp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) { vec![0.0; L*L] } else { Vec::new() };        
         let mut this = Self {
-            flag: flag.to_vec(),
+            flag: flag,
             trans: vec![0.0; L * L],
             num_labels: L,
-            num_items: 0,
+            exp_trans,
+            mexp_trans,
             ..Default::default()
         };
-        if this.flag.contains(&Opt::CTXF_MARGINALS) {
-            this.exp_trans.resize(L * L, 0.0);
-            this.mexp_trans.resize(L * L, 0.0);
-        }
         this.crf1dc_set_num_items(T);
         this.num_items = 0;
         this
@@ -152,14 +164,14 @@ impl Crf1dContext {
             self.row.clear();
             self.row.resize(L, 0.0);
 
-            if self.flag.contains(&Opt::CTXF_VITERBI) {
+            if self.flag.contains(CtxOpt::CTXF_VITERBI) {
                 self.backward_edge.clear();
                 self.backward_edge.resize(T * L, 0);
             }
 
             self.state.clear();
             self.state.resize(T * L, 0.0);
-            if self.flag.contains(&Opt::CTXF_MARGINALS) {
+            if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
                 self.exp_state.clear();
                 self.exp_state.clear();
                 self.exp_state.resize(T * L, 0.0);
@@ -170,18 +182,18 @@ impl Crf1dContext {
         }
     }
 
-    pub(crate) fn reset(&mut self, opts: &[ResetOpt]) {
+    pub(crate) fn reset(&mut self, opts: ResetOpt) {
         let T = self.num_items;
         let L = self.num_labels;
 
-        if opts.contains(&ResetOpt::RF_STATE) {
+        if opts.contains(ResetOpt::RF_STATE) {
             self.state.fill(0.0);
         }
-        if opts.contains(&ResetOpt::RF_TRANS) {
+        if opts.contains(ResetOpt::RF_TRANS) {
             self.trans.fill(0.0);
         }
 
-        if self.flag.contains(&Opt::CTXF_MARGINALS) {
+        if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
             self.mexp_state.fill(0.0);
             self.mexp_trans.fill(0.0);
             self.log_norm = 0.0;
@@ -434,7 +446,7 @@ mod tests {
     fn init() {
         let L = 9;
         let T = 12;
-        let ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], L, T);
+        let ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, L, T);
         assert_eq!(ctx.num_items, 0);
         assert_eq!(ctx.cap_items, T);
     }
@@ -443,17 +455,17 @@ mod tests {
     fn reset() {
         let L = 9;
         let T = 12;
-        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], L, T);
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, L, T);
         assert_eq!(ctx.num_items, 0);
         assert_eq!(ctx.cap_items, T);
-        ctx.reset(&[ResetOpt::RF_STATE]);
+        ctx.reset(ResetOpt::RF_STATE);
         assert_eq!(ctx.log_norm, 0.0);
     }
 
     #[bench]
     fn bench_crf1dc_set_num_items(b: &mut Bencher) {
         b.iter(|| {
-            let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+            let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
             for i in 1..100 {
                 ctx.crf1dc_set_num_items(i);
             }
@@ -462,7 +474,7 @@ mod tests {
 
     #[bench]
     fn bench_crf1dc_alpha_score(b: &mut Bencher) {
-        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS |CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.crf1dc_set_num_items(127);
         b.iter(|| {
             ctx.crf1dc_alpha_score();
@@ -471,7 +483,7 @@ mod tests {
 
     #[bench]
     fn bench_crf1dc_beta_score(b: &mut Bencher) {
-        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.crf1dc_set_num_items(127);
         b.iter(|| {
             ctx.crf1dc_beta_score();
@@ -480,7 +492,7 @@ mod tests {
 
     #[bench]
     fn bench_crf1dc_marginals(b: &mut Bencher) {
-        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.crf1dc_set_num_items(127);
         b.iter(|| {
             ctx.crf1dc_marginals();
@@ -490,10 +502,29 @@ mod tests {
 
     #[bench]
     fn bench_reset(b: &mut Bencher) {
-        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.crf1dc_set_num_items(113);
         b.iter(|| {
-            ctx.reset(&[ResetOpt::RF_STATE]);
+            ctx.reset(ResetOpt::RF_STATE);
         });
+    }
+
+    #[test]
+    fn flags() {
+        #[repr(u8)]
+        #[derive(Debug)]
+        enum Color {
+            Red = 0x01,
+            Green = 0x02,
+            Blue = 0x04,
+        }
+        #[derive(Debug)]
+        struct Car {
+            color: Color,
+            weight: usize,
+        }
+        let mixed = Color::Blue as u8 | Color::Red as u8;
+        let car = Car { color: Color::Red, weight: 10 };
+        println!("{:?}, mixed: {:?}", car, mixed);
     }
 }

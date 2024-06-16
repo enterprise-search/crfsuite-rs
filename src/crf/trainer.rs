@@ -1,5 +1,5 @@
 use super::crf1d::{
-    context::{Crf1dContext, Opt},
+    context::{Crf1dContext, CtxOpt},
     model::FeatRefs,
 };
 use crate::{crf::crf1d::context::ResetOpt, Dataset, Sequence};
@@ -60,7 +60,7 @@ impl Crf1de {
         let N = ds.len();
         let T = ds.max_seq_length();
         log::info!("set data (L: {L}, A: {A}, N: {N}, T: {T})");
-        self.ctx = Crf1dContext::new(&[Opt::CTXF_VITERBI, Opt::CTXF_MARGINALS], L, T);
+        self.ctx = Crf1dContext::new(CtxOpt::CTXF_VITERBI | CtxOpt::CTXF_MARGINALS, L, T);
         log::info!("TODO: opts info");
         log::info!("feature generation (type: crf1d, min_freq: {}, possible_states: {}, possible_transitions: {}", self.opt.feature_minfreq, self.opt.feature_possible_states, self.opt.feature_possible_transitions);
         let begin = Instant::now();
@@ -320,7 +320,7 @@ impl TagEncoder {
         Set the scores (weights) of transition features here because
         these are independent of input label sequences.
         */
-        self.internal.ctx.reset(&[ResetOpt::RF_TRANS]);
+        self.internal.ctx.reset(ResetOpt::RF_TRANS);
         self.internal.transition_score(w);
         self.internal.ctx.crf1dc_exp_transition();
 
@@ -330,7 +330,7 @@ impl TagEncoder {
         for seq in &ds.seqs {
             /* Set label sequences and state scores. */
             self.internal.ctx.crf1dc_set_num_items(seq.len());
-            self.internal.ctx.reset(&[ResetOpt::RF_STATE]);
+            self.internal.ctx.reset(ResetOpt::RF_STATE);
             self.internal.state_score(seq, w);
             self.internal.ctx.crf1dc_exp_state();
 
