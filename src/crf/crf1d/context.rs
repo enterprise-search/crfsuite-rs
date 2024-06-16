@@ -175,23 +175,15 @@ impl Crf1dContext {
         let L = self.num_labels;
 
         if opts.contains(&ResetOpt::RF_STATE) {
-            for i in 0..self.state.len() {
-                self.state[i] = 0.0;
-            }
+            self.state.fill(0.0);            
         }
         if opts.contains(&ResetOpt::RF_TRANS) {
-            for i in 0..L * L {
-                self.trans[i] = 0.0;
-            }
+            self.trans.fill(0.0);
         }
 
         if self.flag.contains(&Opt::CTXF_MARGINALS) {
-            for i in 0..T * L {
-                self.mexp_state[i] = 0.0;
-            }
-            for i in 0..L * L {
-                self.mexp_trans[i] = 0.0;
-            }
+            self.mexp_state.fill(0.0);
+            self.mexp_trans.fill(0.0);
             self.log_norm = 0.0;
         }
     }
@@ -348,10 +340,7 @@ impl Crf1dContext {
         /* Compute the beta scores at (t, *). */
         for t in (0..T - 1).rev() {
             for i in 0..L {
-                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)];
-            }
-            for i in 0..L {
-                self.row[i] *= (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
+                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)] * (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
             }
 
             /* Compute the beta score at (t, i). */
@@ -480,10 +469,28 @@ mod tests {
 
     #[bench]
     fn bench_crf1dc_alpha_score(b: &mut Bencher) {
-        b.iter(|| {
-            let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
-            ctx.crf1dc_set_num_items(100);
+        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        ctx.crf1dc_set_num_items(127);
+        b.iter(|| {            
             ctx.crf1dc_alpha_score();
+        });
+    }
+
+    #[bench]
+    fn bench_crf1dc_beta_score(b: &mut Bencher) {
+        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        ctx.crf1dc_set_num_items(127);
+        b.iter(|| {
+            ctx.crf1dc_beta_score();
+        });
+    }
+
+    #[bench]
+    fn bench_reset(b: &mut Bencher) {
+        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        ctx.crf1dc_set_num_items(113);
+        b.iter(|| {
+            ctx.reset(&[ResetOpt::RF_STATE]);
         });
     }
 }
