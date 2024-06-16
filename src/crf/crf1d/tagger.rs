@@ -42,7 +42,7 @@ impl<'a> Crf1dTagger<'a> {
                 }
             }
         }
-        ctx.crf1dc_exp_transition();
+        ctx.exp_transition();
         let mut this = Self {
             model: model,
             ctx: ctx,
@@ -62,7 +62,7 @@ impl<'a> Crf1dTagger<'a> {
 impl<'a> Tagger for Crf1dTagger<'a> {
     fn set_seq(&mut self, instance: &Sequence) {
         let T = instance.len();
-        self.ctx.crf1dc_set_num_items(T);
+        self.ctx.resize(T);
         self.ctx.reset(ResetOpt::RF_STATE);
 
         /* Loop over the items in the sequence. */

@@ -325,24 +325,24 @@ impl TagEncoder {
         */
         self.internal.ctx.reset(ResetOpt::RF_TRANS);
         self.internal.transition_score(w);
-        self.internal.ctx.crf1dc_exp_transition();
+        self.internal.ctx.exp_transition();
 
         // Compute model expectations.
         let mut logl = 0.0;
         for seq in &ds.seqs {
             /* Set label sequences and state scores. */
-            self.internal.ctx.crf1dc_set_num_items(seq.len());
+            self.internal.ctx.resize(seq.len());
             self.internal.ctx.reset(ResetOpt::RF_STATE);
             self.internal.state_score(seq, w);
-            self.internal.ctx.crf1dc_exp_state();
+            self.internal.ctx.exp_state();
 
             /* Compute forward/backward scores. */
-            self.internal.ctx.crf1dc_alpha_score();
-            self.internal.ctx.crf1dc_beta_score();
-            self.internal.ctx.crf1dc_marginals();
+            self.internal.ctx.alpha_score();
+            self.internal.ctx.beta_score();
+            self.internal.ctx.marginals();
 
             /* Compute the probability of the input sequence on the model. */
-            let logp = self.internal.ctx.crf1dc_score(&seq.labels) - self.internal.ctx.crf1dc_lognorm();
+            let logp = self.internal.ctx.score(&seq.labels) - self.internal.ctx.lognorm();
             /* Update the log-likelihood. */
             logl += logp * seq.weight;
 

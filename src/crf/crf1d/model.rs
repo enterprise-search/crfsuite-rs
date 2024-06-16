@@ -5,7 +5,10 @@ use crfsuite_sys::crfsuite_dictionary_t;
 use libc::c_char;
 use serde::{Deserialize, Serialize};
 
-use crate::{crf::{model::Model, trainer::FeatType}, quark::{Quark, StringTable}};
+use crate::{
+    crf::{model::Model, trainer::FeatType},
+    quark::{Quark, StringTable},
+};
 
 use super::tagger::Crf1dTagger;
 
@@ -13,7 +16,7 @@ pub type FeatRefs = Vec<usize>;
 
 #[repr(C)]
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Feature {
+pub(crate) struct Feature {
     pub cat: FeatType,
     pub src: u32,
     pub dst: u32,
@@ -356,7 +359,10 @@ impl Crf1dModel {
             for j in 0..refs.len() {
                 let fid = self.crf1dm_get_featureid(refs, j);
                 let f = self.crf1dm_get_feature(fid);
-                assert!(f.src as usize == i, "WARNING: an inconsistent attribute reference.");
+                assert!(
+                    f.src as usize == i,
+                    "WARNING: an inconsistent attribute reference."
+                );
                 let from = self.attrs.to_str(f.src as usize).unwrap_or("NULL");
                 let to = self.labels.to_str(f.dst as usize).unwrap_or("NULL");
                 println!("({:?}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
@@ -390,7 +396,10 @@ impl Model for Crf1dModel {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::{BufReader, BufWriter}, time::Instant};
+    use std::{
+        io::{BufReader, BufWriter},
+        time::Instant,
+    };
 
     use test::Bencher;
 
@@ -422,7 +431,7 @@ mod tests {
     fn serde() {
         let fpath = "ner.json";
         let f = File::open(fpath).expect("failed to open file");
-        let t:T = serde_json::from_reader(f).expect("failed to read model");
+        let t: T = serde_json::from_reader(f).expect("failed to read model");
         let ofpath = "ner.bson";
         let v = bson::to_vec(&t).expect("failed to serialize with bson");
         let mut f = File::create(ofpath).expect("failed to create model file");
@@ -435,7 +444,7 @@ mod tests {
         //    10,587,554.20
         b.iter(|| {
             let f = File::open(fpath).expect("failed to open file");
-            let t:T = bson::from_reader(f).expect("failed to read model");
+            let t: T = bson::from_reader(f).expect("failed to read model");
         });
     }
 
@@ -445,7 +454,7 @@ mod tests {
         //    15,764,570.80 ns/iter
         b.iter(|| {
             let f = File::open(fpath).expect("failed to open file");
-            let t:T = serde_json::from_reader(BufReader::new(f)).expect("failed to read model");
+            let t: T = serde_json::from_reader(BufReader::new(f)).expect("failed to read model");
         });
     }
 
@@ -453,7 +462,7 @@ mod tests {
     fn bench_model_write_bson(b: &mut Bencher) {
         let fpath = "ner.bson";
         let f = File::open(fpath).expect("failed to open file");
-        let t:T = bson::from_reader(f).expect("failed to read model");
+        let t: T = bson::from_reader(f).expect("failed to read model");
         //     4,633,483.30
         b.iter(|| {
             let ofpath = "ner.bson";
@@ -461,5 +470,5 @@ mod tests {
             let mut f = File::create(ofpath).expect("failed to create model file");
             f.write(&v).expect("failed to write model file");
         });
-    }    
+    }
 }

@@ -154,12 +154,12 @@ impl Crf1dContext {
             mexp_trans,
             ..Default::default()
         };
-        this.crf1dc_set_num_items(num_items);
+        this.resize(num_items);
         this.num_items = 0;
         this
     }
 
-    pub fn crf1dc_set_num_items(&mut self, num_items: usize) {
+    pub fn resize(&mut self, num_items: usize) {
         let num_labels = self.num_labels;
         self.num_items = num_items;
         if self.cap_items < num_items {
@@ -216,7 +216,7 @@ impl Crf1dContext {
         }
     }
 
-    pub fn crf1dc_exp_transition(&mut self) {
+    pub fn exp_transition(&mut self) {
         let L = self.num_labels;
         for i in 0..L * L {
             self.exp_trans[i] = self.trans[i].exp();
@@ -282,17 +282,17 @@ impl Crf1dContext {
     }
 
     #[inline]
-    pub(crate) fn crf1dc_lognorm(&self) -> f64 {
+    pub(crate) fn lognorm(&self) -> f64 {
         self.log_norm
     }
 
-    pub(crate) fn crf1dc_exp_state(&mut self) {
+    pub(crate) fn exp_state(&mut self) {
         for i in 0..self.state.len() {
             self.exp_state[i] = self.state[i].exp();
         }
     }
 
-    pub(crate) fn crf1dc_alpha_score(&mut self) {
+    pub(crate) fn alpha_score(&mut self) {
         let L = self.num_labels;
         let T = self.num_items;
 
@@ -357,7 +357,7 @@ impl Crf1dContext {
         self.log_norm = -sum;
     }
 
-    pub(crate) fn crf1dc_beta_score(&mut self) {
+    pub(crate) fn beta_score(&mut self) {
         let T = self.num_items;
         let L = self.num_labels;
 
@@ -384,7 +384,7 @@ impl Crf1dContext {
         }
     }
 
-    pub(crate) fn crf1dc_marginals(&mut self) {
+    pub(crate) fn marginals(&mut self) {
         let L = self.num_labels;
         let T = self.num_items;
 
@@ -431,7 +431,7 @@ impl Crf1dContext {
         }
     }
 
-    pub(crate) fn crf1dc_score(&self, labels: &Vec<usize>) -> f64 {
+    pub(crate) fn score(&self, labels: &Vec<usize>) -> f64 {
         assert!(!labels.is_empty(), "empty labels");
         let L = self.num_labels;
         let T = self.num_items;
@@ -484,7 +484,7 @@ mod tests {
         b.iter(|| {
             let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
             for i in 1..100 {
-                ctx.crf1dc_set_num_items(i);
+                ctx.resize(i);
             }
         });
     }
@@ -492,27 +492,27 @@ mod tests {
     #[bench]
     fn bench_crf1dc_alpha_score(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
-        ctx.crf1dc_set_num_items(127);
+        ctx.resize(127);
         b.iter(|| {
-            ctx.crf1dc_alpha_score();
+            ctx.alpha_score();
         });
     }
 
     #[bench]
     fn bench_crf1dc_beta_score(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
-        ctx.crf1dc_set_num_items(127);
+        ctx.resize(127);
         b.iter(|| {
-            ctx.crf1dc_beta_score();
+            ctx.beta_score();
         });
     }
 
     #[bench]
     fn bench_crf1dc_marginals(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
-        ctx.crf1dc_set_num_items(127);
+        ctx.resize(127);
         b.iter(|| {
-            ctx.crf1dc_marginals();
+            ctx.marginals();
         });
         assert_eq!(ctx.log_norm, 0.0);
     }
@@ -520,7 +520,7 @@ mod tests {
     #[bench]
     fn bench_reset(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
-        ctx.crf1dc_set_num_items(113);
+        ctx.resize(113);
         b.iter(|| {
             ctx.reset(ResetOpt::RF_STATE);
         });
