@@ -175,7 +175,7 @@ impl Crf1dContext {
         let L = self.num_labels;
 
         if opts.contains(&ResetOpt::RF_STATE) {
-            self.state.fill(0.0);            
+            self.state.fill(0.0);
         }
         if opts.contains(&ResetOpt::RF_TRANS) {
             self.trans.fill(0.0);
@@ -340,7 +340,8 @@ impl Crf1dContext {
         /* Compute the beta scores at (t, *). */
         for t in (0..T - 1).rev() {
             for i in 0..L {
-                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)] * (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
+                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)]
+                    * (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
             }
 
             /* Compute the beta score at (t, i). */
@@ -349,10 +350,7 @@ impl Crf1dContext {
                 for j in 0..L {
                     s += (self.exp_trans)[(self.num_labels) * (i) + (j)] * self.row[j];
                 }
-                (self.beta_score)[(self.num_labels) * (t) + (i)] = s;
-            }
-            for i in 0..L {
-                (self.beta_score)[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
+                (self.beta_score)[(self.num_labels) * (t) + (i)] = s * self.scale_factor[t];
             }
         }
     }
@@ -368,15 +366,10 @@ impl Crf1dContext {
         */
         for t in 0..T {
             for i in 0..L {
-                (self.mexp_state)[(self.num_labels) * (t) + (i)] =
-                    (self.alpha_score)[(self.num_labels) * (t) + (i)];
-            }
-            for i in 0..L {
-                (self.mexp_state)[(self.num_labels) * (t) + (i)] *=
-                    (self.beta_score)[(self.num_labels) * (t) + (i)];
-            }
-            for i in 0..L {
-                (self.mexp_state)[(self.num_labels) * (t) + (i)] *= 1.0 / self.scale_factor[t];
+                self.mexp_state[self.num_labels * (t) + (i)] = self.alpha_score
+                    [self.num_labels * (t) + (i)]
+                    * (self.beta_score)[(self.num_labels) * (t) + (i)]
+                    / self.scale_factor[t];
             }
         }
 
@@ -471,7 +464,7 @@ mod tests {
     fn bench_crf1dc_alpha_score(b: &mut Bencher) {
         let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
         ctx.crf1dc_set_num_items(127);
-        b.iter(|| {            
+        b.iter(|| {
             ctx.crf1dc_alpha_score();
         });
     }
@@ -483,6 +476,16 @@ mod tests {
         b.iter(|| {
             ctx.crf1dc_beta_score();
         });
+    }
+
+    #[bench]
+    fn bench_crf1dc_marginals(b: &mut Bencher) {
+        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+        ctx.crf1dc_set_num_items(127);
+        b.iter(|| {
+            ctx.crf1dc_marginals();
+        });
+        assert_eq!(ctx.log_norm, 0.0);
     }
 
     #[bench]
