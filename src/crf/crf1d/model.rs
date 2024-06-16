@@ -36,8 +36,6 @@ struct T {
     label_refs: Vec<FeatRefs>,
 }
 
-const FT_STATE: u32 = 0;
-
 #[no_mangle]
 pub unsafe extern "C" fn save_model_r(
     fpath: *const c_char,
