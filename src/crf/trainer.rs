@@ -1,15 +1,29 @@
 
+use serde::{Deserialize, Serialize};
+
 use super::crf1d::{
     context::{Crf1dContext, CtxOpt},
     model::FeatRefs,
 };
 use crate::{crf::crf1d::context::ResetOpt, Dataset, Sequence};
-use std::{collections::HashSet, hash::Hash, path::PathBuf, time::Instant};
+use std::{collections::HashSet, convert::TryFrom, hash::Hash, path::PathBuf, time::Instant};
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-enum FeatType {
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
+pub(crate) enum FeatType {
     FT_STATE = 0,
     FT_TRANS = 1,
+}
+
+impl TryFrom<u32> for FeatType {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            x if x == Self::FT_STATE as u32 => Ok(Self::FT_STATE),
+            x if x == Self::FT_TRANS as u32 => Ok(Self::FT_TRANS),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug)]

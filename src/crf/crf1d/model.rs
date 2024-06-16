@@ -5,19 +5,16 @@ use crfsuite_sys::crfsuite_dictionary_t;
 use libc::c_char;
 use serde::{Deserialize, Serialize};
 
-use crate::{crf::model::Model, quark::{Quark, StringTable}};
+use crate::{crf::{model::Model, trainer::FeatType}, quark::{Quark, StringTable}};
 
 use super::tagger::Crf1dTagger;
 
 pub type FeatRefs = Vec<usize>;
 
-#[derive(Debug)]
-pub enum FeatCat {}
-
 #[repr(C)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Feature {
-    pub cat: u32,
+    pub cat: FeatType,
     pub src: u32,
     pub dst: u32,
     pub weight: f64,
@@ -74,7 +71,7 @@ pub unsafe extern "C" fn save_model_r(
                 .as_ref()
                 .expect("failed to read feature");
             let mut src = f.src;
-            if f.cat == FT_STATE {
+            if f.cat == FeatType::FT_STATE {
                 if amap[f.src as usize] < 0 {
                     amap[f.src as usize] = B;
                     B += 1;
@@ -243,7 +240,7 @@ impl Crf1dModel {
             let weight: f64 =
                 f64::from_le_bytes(buffer[offset + 12..offset + 20].try_into().unwrap());
             let f = Feature {
-                cat,
+                cat: cat.try_into().expect("invalid feature type"),
                 src,
                 dst,
                 weight,
@@ -351,7 +348,7 @@ impl Crf1dModel {
                 let f = self.crf1dm_get_feature(fid);
                 let from = self.labels.to_str(f.src as usize).unwrap_or("NULL");
                 let to = self.labels.to_str(f.dst as usize).unwrap_or("NULL");
-                println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
+                println!("({:?}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
             }
         }
         /* Dump the transition features. */
@@ -364,7 +361,7 @@ impl Crf1dModel {
                 assert!(f.src as usize == i, "WARNING: an inconsistent attribute reference.");
                 let from = self.attrs.to_str(f.src as usize).unwrap_or("NULL");
                 let to = self.labels.to_str(f.dst as usize).unwrap_or("NULL");
-                println!("({}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
+                println!("({:?}) {} -> {}: {:.4}", f.cat, from, to, f.weight);
             }
         }
     }
