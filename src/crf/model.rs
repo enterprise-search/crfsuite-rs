@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{quark::Quark};
+use crate::quark::Quark;
 
 use super::tagger::Tagger;
 

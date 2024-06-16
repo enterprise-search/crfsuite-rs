@@ -36,7 +36,7 @@ fn tag() {
                     .map(|s| m_attrs.to_id(s))
                     .flatten()
                     .map(|i| Attr {
-                        id: i as i32,
+                        id: i as u32,
                         value: 1.0,
                     })
                     .collect();

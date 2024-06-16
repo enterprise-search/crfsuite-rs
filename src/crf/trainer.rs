@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 
 use super::crf1d::{
@@ -192,23 +191,19 @@ fn crf1df_init_references(
     forward_trans: &mut Vec<FeatRefs>,
     features: &Vec<Feat>,
 ) {
-    let K = features.len();
-    let A = attrs.len();
-    let L = forward_trans.len();
-    log::info!("generate: A: {A}, K: {K}, L: {L}");
-
     /*
         The purpose of this routine is to collect references (indices) of:
         - state features fired by each attribute (attributes)
         - transition features pointing from each label (trans)
     */
-    for k in 0..K {
-        let f = &features[k];
+    // for k in 0..K {
+        // let f = &features[k];
+    features.iter().enumerate().for_each(|(k, f)| {
         match &f.ftype {
             FeatType::FT_STATE => attrs[f.src as usize].push(k),
-            FeatType::FT_TRANS => forward_trans[f.src as usize].push(k),            
+            FeatType::FT_TRANS => forward_trans[f.src as usize].push(k),
         }
-    }
+    });
 }
 
 fn crf1df_generate(
@@ -217,22 +212,17 @@ fn crf1df_generate(
     connect_all_edges: bool,
     feature_min_freq: f64,
 ) -> Vec<Feat> {
-    let N = ds.len();
     let L = ds.num_labels();
-    log::info!("crf1df_generate: (N: {N}, L: {L})");
     let mut set = FeatSet::default();
-    for s in 0..N {
+    for seq in &ds.seqs {
         let mut prev = L;
-        let mut curr = 0;
-        let seq = ds.get(s);
-        let T = seq.len();
 
-        assert!(T > 0, "unexpected empty sequence");
+        assert!(seq.len() > 0, "unexpected empty sequence");
 
         /* Loop over the items in the sequence. */
-        for t in 0..T {
+        for t in 0..seq.len() {
             let item = &seq.items[t];
-            curr = seq.labels[t];
+            let curr = seq.labels[t];
 
             /* Transition feature: label #prev -> label #(item->yid).
             Features with previous label #L are transition BOS. */
@@ -249,7 +239,7 @@ fn crf1df_generate(
                 /* State feature: attribute #a -> state #(item->yid). */
                 set.add(Feat {
                     ftype: FeatType::FT_STATE,
-                    src: attr.id as u32,
+                    src: attr.id,
                     dst: curr as u32,
                     freq: seq.weight * attr.value,
                 });
@@ -261,7 +251,7 @@ fn crf1df_generate(
                     for i in 0..L {
                         set.add(Feat {
                             ftype: FeatType::FT_STATE,
-                            src: attr.id as u32,
+                            src: attr.id,
                             dst: i as u32,
                             freq: 0.0,
                         });
@@ -273,7 +263,6 @@ fn crf1df_generate(
         }
         // log::info!("progress: {s}/{N}");
     }
-    log::info!("finished {}", set.m.len());
     /* Generate edge features representing all pairs of labels.
     These features are not unobserved in the training data
     (zero expexcations). */
@@ -367,6 +356,10 @@ pub trait Crf1dTrainer {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+
+    use test::Bencher;
+
     use super::*;
 
     #[test]
@@ -408,4 +401,40 @@ mod tests {
         ];
         let o = TagEncoder::new();
     }
+
+    #[test]
+    fn feature_generate() {
+        let f = File::open("test.data").expect("failed to open file");
+        let ds = Dataset::try_from(f).expect("failed to read file");
+        let feats = crf1df_generate(&ds, false, true, 0.0);
+        assert_eq!(feats.len(), 137415);
+    }
+
+    #[bench]
+    fn bench_feature(b: &mut Bencher) {
+        // 112,398,766.60 ns/iter (+/- 25,375,252.00)
+        //  86,646,579.20 ns/iter (+/- 2,964,393.23)
+        let f = File::open("test.data").expect("failed to open file");
+        let ds = Dataset::try_from(f).expect("failed to read file");
+        b.iter(|| {
+            let feats = crf1df_generate(&ds, false, true, 0.0);
+            assert_eq!(feats.len(), 137415);
+        });
+    }
+
+    #[bench]
+    fn bench_feature_init_refs(b: &mut Bencher) {
+        // 1,029,148.44 ns/iter (+/- 511,912.35)
+        let f = File::open("test.data").expect("failed to open file");
+        let ds = Dataset::try_from(f).expect("failed to read file");
+        let feats = crf1df_generate(&ds, false, true, 0.0);
+        let A = ds.num_attrs();
+        let L = ds.num_labels();
+        let mut attrs = vec![FeatRefs::default(); A];
+        let mut trans = vec![FeatRefs::default(); L];
+        b.iter(|| {
+            crf1df_init_references(&mut attrs, &mut trans, &feats);
+        });
+    }
+    
 }

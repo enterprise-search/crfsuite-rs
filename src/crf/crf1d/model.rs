@@ -397,7 +397,7 @@ impl Model for Crf1dModel {
 #[cfg(test)]
 mod tests {
     use std::{
-        io::{BufReader, BufWriter},
+        io::{BufReader, BufWriter, Write},
         time::Instant,
     };
 
@@ -469,6 +469,20 @@ mod tests {
             let v = bson::to_vec(&t).expect("failed to serialize with bson");
             let mut f = File::create(ofpath).expect("failed to create model file");
             f.write(&v).expect("failed to write model file");
+        });
+    }
+
+    #[bench]
+    fn bench_model_write_json(b: &mut Bencher) {
+        let fpath = "ner.bson";
+        let f = File::open(fpath).expect("failed to open file");
+        let t: T = bson::from_reader(f).expect("failed to read model");
+        //     20,836,904.20
+        b.iter(|| {
+            let ofpath = "ner.json";
+            let v = bson::to_vec(&t).expect("failed to serialize with bson");
+            let f = File::create(ofpath).expect("failed to create model file");
+            serde_json::to_writer(BufWriter::new(f), &v).expect("failed to write json");
         });
     }
 }

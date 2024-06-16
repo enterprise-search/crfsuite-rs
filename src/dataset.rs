@@ -14,7 +14,7 @@ pub type Item = Vec<Attr>;
 #[repr(C)]
 #[derive(Debug)]
 pub struct Attr {
-    pub id: i32,
+    pub id: u32,
     pub value: f64,
 }
 
@@ -76,7 +76,7 @@ impl From<Lines<'_>> for Dataset {
                     let item: Item = attrs
                         .split('\t')
                         .map(|s| Attr {
-                            id: m_attrs.find_or_insert(s) as i32,
+                            id: m_attrs.find_or_insert(s) as u32,
                             value: 1.0,
                         })
                         .collect();
@@ -110,7 +110,7 @@ impl TryFrom<File> for Dataset {
                     let item: Item = attrs
                         .split('\t')
                         .map(|s| Attr {
-                            id: m_attrs.find_or_insert(s) as i32,
+                            id: m_attrs.find_or_insert(s) as u32,
                             value: 1.0,
                         })
                         .collect();
@@ -139,7 +139,7 @@ impl Dataset {
                     let item: Item = attrs
                         .split('\t')
                         .map(|s| Attr {
-                            id: self.m_attrs.find_or_insert(s) as i32,
+                            id: self.m_attrs.find_or_insert(s) as u32,
                             value: 1.0,
                         })
                         .collect();

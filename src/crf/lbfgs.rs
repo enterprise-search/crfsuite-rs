@@ -82,7 +82,7 @@ unsafe extern "C" fn proc_evaluate(
     let mut f = this.encoder.objective_and_gradients_batch(trainset, xs, gs);
 
     /* L2 regularization. */
-    let mut norm = 0.0;    
+    let mut norm = 0.0;
     if this.c2 > 0.0 {
         let c22 = this.c2 * 2.0;
         for i in 0..n {
