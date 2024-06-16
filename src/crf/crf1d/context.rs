@@ -143,39 +143,27 @@ impl Crf1dContext {
         let L = self.num_labels;
         self.num_items = T;
         if self.cap_items < T {
+            self.alpha_score.clear();
             self.alpha_score.resize(T * L, 0.0);
+            self.beta_score.clear();
             self.beta_score.resize(T * L, 0.0);
-            for i in 0..T * L {
-                self.alpha_score[i] = 0.0;
-                self.beta_score[i] = 0.0;
-            }
+            self.scale_factor.clear();
             self.scale_factor.resize(T, 0.0);
-            for i in 0..T {
-                self.scale_factor[i] = 0.0;
-            }
+            self.row.clear();
             self.row.resize(L, 0.0);
-            for i in 0..L {
-                self.row[i] = 0.0;
-            }
 
             if self.flag.contains(&Opt::CTXF_VITERBI) {
+                self.backward_edge.clear();
                 self.backward_edge.resize(T * L, 0);
-                for i in 0..T * L {
-                    self.backward_edge[i] = 0;
-                }
             }
 
+            self.state.clear();
             self.state.resize(T * L, 0.0);
-            for i in 0..T * L {
-                self.state[i] = 0.0;
-            }
             if self.flag.contains(&Opt::CTXF_MARGINALS) {
+                self.exp_state.clear();
+                self.exp_state.clear();
                 self.exp_state.resize(T * L, 0.0);
                 self.mexp_state.resize(T * L, 0.0);
-                for i in 0..T * L {
-                    self.exp_state[i] = 0.0;
-                    self.mexp_state[i] = 0.0;
-                }
             }
 
             self.cap_items = T;
@@ -289,39 +277,51 @@ impl Crf1dContext {
 
         /* Compute the alpha scores on nodes (0, *). alpha[0][j] = state[0][j] */
         for i in 0..L {
-            (self.alpha_score)[(self.num_labels) * (0) + (i)] = (self.exp_state)[(self.num_labels) * (0) + (i)];
+            (self.alpha_score)[(self.num_labels) * (0) + (i)] =
+                (self.exp_state)[(self.num_labels) * (0) + (i)];
         }
         let mut sum = 0.0;
-        for i in 0..L {            
-            sum += (self.alpha_score)[(self.num_labels) * (0) + (i)];
-        }        
-        self.scale_factor[0] = if sum != 0.0 { 1.0 / sum } else { 1.0 };
         for i in 0..L {
-            (self.alpha_score)[(self.num_labels) * (0) + (i)] *= self.scale_factor[0];
+            sum += (self.alpha_score)[(self.num_labels) * (0) + (i)];
+        }
+        if sum != 0.0 {
+            self.scale_factor[0] = 1.0 / sum;
+            for i in 0..L {
+                (self.alpha_score)[(self.num_labels) * (0) + (i)] *= self.scale_factor[0];
+            }
+        } else {
+            self.scale_factor[0] = 1.0;
         }
 
         /* Compute the alpha scores on nodes (t, *).
             alpha[t][j] = state[t][j] * \sum_{i} alpha[t-1][i] * trans[i][j]
-        */        
+        */
         for t in 1..T {
             for i in 0..L {
                 ((self.alpha_score)[(self.num_labels) * (t) + (i)]) = 0.0;
             }
             for i in 0..L {
                 for j in 0..L {
-                    (self.alpha_score)[(self.num_labels) * (t) + (j)] += (self.alpha_score)[(self.num_labels) * (t - 1) + (i)] * (self.exp_trans)[(self.num_labels) * (i) + (j)];
+                    (self.alpha_score)[(self.num_labels) * (t) + (j)] += (self.alpha_score)
+                        [(self.num_labels) * (t - 1) + (i)]
+                        * (self.exp_trans)[(self.num_labels) * (i) + (j)];
                 }
             }
             for i in 0..L {
-                (self.alpha_score)[(self.num_labels) * (t) + (i)] *= (self.exp_state)[(self.num_labels) * (t) + (i)];
+                (self.alpha_score)[(self.num_labels) * (t) + (i)] *=
+                    (self.exp_state)[(self.num_labels) * (t) + (i)];
             }
             sum = 0.0;
             for i in 0..L {
                 sum += (self.alpha_score)[(self.num_labels) * (t) + (i)];
             }
-            self.scale_factor[t] = if sum != 0.0 { 1.0 / sum } else { 1.0 };
-            for i in 0..L {
-                (self.alpha_score)[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
+            if sum != 0.0 {
+                self.scale_factor[t] = 1.0 / sum;
+                for i in 0..L {
+                    (self.alpha_score)[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
+                }
+            } else {
+                self.scale_factor[t] = 1.0;
             }
         }
 
@@ -342,8 +342,8 @@ impl Crf1dContext {
 
         /* Compute the beta scores at (T-1, *). */
         for i in 0..L {
-            (self.beta_score)[(self.num_labels) * (T - 1) + (i)] = self.scale_factor[T-1];
-        }        
+            (self.beta_score)[(self.num_labels) * (T - 1) + (i)] = self.scale_factor[T - 1];
+        }
 
         /* Compute the beta scores at (t, *). */
         for t in (0..T - 1).rev() {
@@ -444,6 +444,8 @@ impl Crf1dContext {
 
 #[cfg(test)]
 mod tests {
+    use test::Bencher;
+
     use super::*;
 
     #[test]
@@ -464,5 +466,24 @@ mod tests {
         assert_eq!(ctx.cap_items, T);
         ctx.reset(&[ResetOpt::RF_STATE]);
         assert_eq!(ctx.log_norm, 0.0);
+    }
+
+    #[bench]
+    fn bench_crf1dc_set_num_items(b: &mut Bencher) {
+        b.iter(|| {
+            let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+            for i in 1..100 {
+                ctx.crf1dc_set_num_items(i);
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_crf1dc_alpha_score(b: &mut Bencher) {
+        b.iter(|| {
+            let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], 31, 0);
+            ctx.crf1dc_set_num_items(100);
+            ctx.crf1dc_alpha_score();
+        });
     }
 }

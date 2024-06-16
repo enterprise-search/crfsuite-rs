@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufRead, path::Path, time::Duration};
+use std::{fs::File, io::BufRead, path::Path, time::{Duration, Instant}};
 
 use crfsuite::{Attribute, Item, Trainer};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -22,7 +22,6 @@ fn train(fpath: &Path) {
         }
     });
 
-    log::info!("reading dataset from: {:?}", fpath);
     let f = File::open(fpath).expect("failed to open: {fpath}");
     let mut count = 0;
     let mut items = Vec::new();
@@ -56,9 +55,10 @@ fn train(fpath: &Path) {
         items.clear();
         labels.clear();
     }
-    log::info!("read {} items", count);
     let model = "/tmp/bench";
+    let start = Instant::now();
     trainer.train(model, -1).expect("failed to train");
+    println!("took: {:?}", start.elapsed());
 }
 
 fn train_benchmark(c: &mut Criterion) {
