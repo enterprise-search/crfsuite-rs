@@ -1,4 +1,3 @@
-
 use bitflags::bitflags;
 
 #[derive(Debug)]
@@ -135,50 +134,59 @@ pub(crate) struct Crf1dContext {
 }
 
 impl Crf1dContext {
-    pub fn new(flag: CtxOpt, L: usize, T: usize) -> Self {
-        let exp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) { vec![0.0; L*L] } else { Vec::new() };
-        let mexp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) { vec![0.0; L*L] } else { Vec::new() };        
+    pub fn new(flag: CtxOpt, num_labels: usize, num_items: usize) -> Self {
+        let exp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) {
+            vec![0.0; num_labels * num_labels]
+        } else {
+            Vec::new()
+        };
+        let mexp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) {
+            vec![0.0; num_labels * num_labels]
+        } else {
+            Vec::new()
+        };
+        let trans = vec![0.0; num_labels * num_labels];
         let mut this = Self {
-            flag: flag,
-            trans: vec![0.0; L * L],
-            num_labels: L,
+            flag,
+            trans,
+            num_labels,
             exp_trans,
             mexp_trans,
             ..Default::default()
         };
-        this.crf1dc_set_num_items(T);
+        this.crf1dc_set_num_items(num_items);
         this.num_items = 0;
         this
     }
 
-    pub fn crf1dc_set_num_items(&mut self, T: usize) {
-        let L = self.num_labels;
-        self.num_items = T;
-        if self.cap_items < T {
+    pub fn crf1dc_set_num_items(&mut self, num_items: usize) {
+        let num_labels = self.num_labels;
+        self.num_items = num_items;
+        if self.cap_items < num_items {
             self.alpha_score.clear();
-            self.alpha_score.resize(T * L, 0.0);
+            self.alpha_score.resize(num_items * num_labels, 0.0);
             self.beta_score.clear();
-            self.beta_score.resize(T * L, 0.0);
+            self.beta_score.resize(num_items * num_labels, 0.0);
             self.scale_factor.clear();
-            self.scale_factor.resize(T, 0.0);
+            self.scale_factor.resize(num_items, 0.0);
             self.row.clear();
-            self.row.resize(L, 0.0);
+            self.row.resize(num_labels, 0.0);
 
             if self.flag.contains(CtxOpt::CTXF_VITERBI) {
                 self.backward_edge.clear();
-                self.backward_edge.resize(T * L, 0);
+                self.backward_edge.resize(num_items * num_labels, 0);
             }
 
             self.state.clear();
-            self.state.resize(T * L, 0.0);
+            self.state.resize(num_items * num_labels, 0.0);
             if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
                 self.exp_state.clear();
                 self.exp_state.clear();
-                self.exp_state.resize(T * L, 0.0);
-                self.mexp_state.resize(T * L, 0.0);
+                self.exp_state.resize(num_items * num_labels, 0.0);
+                self.mexp_state.resize(num_items * num_labels, 0.0);
             }
 
-            self.cap_items = T;
+            self.cap_items = num_items;
         }
     }
 
@@ -187,21 +195,21 @@ impl Crf1dContext {
         let L = self.num_labels;
 
         if opts.contains(ResetOpt::RF_STATE) {
-            for i in 0..T*L {
+            for i in 0..T * L {
                 self.state[i] = 0.0;
             }
         }
         if opts.contains(ResetOpt::RF_TRANS) {
-            for i in 0..L*L {
+            for i in 0..L * L {
                 self.trans[i] = 0.0;
             }
         }
 
         if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
-            for i in 0..T*L {
+            for i in 0..T * L {
                 self.mexp_state[i] = 0.0;
             }
-            for i in 0..L*L {
+            for i in 0..L * L {
                 self.mexp_trans[i] = 0.0;
             }
             self.log_norm = 0.0;
@@ -273,6 +281,7 @@ impl Crf1dContext {
         max_score
     }
 
+    #[inline]
     pub(crate) fn crf1dc_lognorm(&self) -> f64 {
         self.log_norm
     }
@@ -482,7 +491,7 @@ mod tests {
 
     #[bench]
     fn bench_crf1dc_alpha_score(b: &mut Bencher) {
-        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS |CtxOpt::CTXF_VITERBI, 31, 0);
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.crf1dc_set_num_items(127);
         b.iter(|| {
             ctx.crf1dc_alpha_score();
@@ -532,7 +541,10 @@ mod tests {
             weight: usize,
         }
         let mixed = Color::Blue as u8 | Color::Red as u8;
-        let car = Car { color: Color::Red, weight: 10 };
+        let car = Car {
+            color: Color::Red,
+            weight: 10,
+        };
         println!("{:?}, mixed: {:?}", car, mixed);
     }
 }
