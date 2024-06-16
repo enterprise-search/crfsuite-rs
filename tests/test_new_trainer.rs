@@ -1,9 +1,9 @@
-use std::fs::File;
+use std::{fs::File, time::Instant};
 
 use crfsuite::{
     crf::{
-        lbfgs::{self, Lbfgs},
-        trainer::{Crf1dTrainer, TagEncoder},
+        lbfgs,
+        trainer::TagEncoder,
     },
     Dataset,
 };
@@ -11,8 +11,9 @@ use crfsuite::{
 #[test]
 fn train() {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Info)
         .init();
+    let begin = Instant::now();
     let input = File::open("test.data").expect("failed to open file");
     let mut ds = Dataset::default();
     ds.read_file(input).expect("failed to read input file");
@@ -21,6 +22,7 @@ fn train() {
     let holdout = usize::MAX;
     let encoder = TagEncoder::new();
     lbfgs::train(encoder, &ds, fpath.into(), holdout);
+    println!("took: {:?}", begin.elapsed());
 }
 
 #[test]
