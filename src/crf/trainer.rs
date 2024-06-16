@@ -328,7 +328,6 @@ impl TagEncoder {
         self.internal.ctx.crf1dc_exp_transition();
 
         // Compute model expectations.
-        let mut logp = 0.0;
         let mut logl = 0.0;
         for seq in &ds.seqs {
             /* Set label sequences and state scores. */
@@ -343,7 +342,7 @@ impl TagEncoder {
             self.internal.ctx.crf1dc_marginals();
 
             /* Compute the probability of the input sequence on the model. */
-            logp = self.internal.ctx.crf1dc_score(&seq.labels) - self.internal.ctx.crf1dc_lognorm();
+            let logp = self.internal.ctx.crf1dc_score(&seq.labels) - self.internal.ctx.crf1dc_lognorm();
             /* Update the log-likelihood. */
             logl += logp * seq.weight;
 
