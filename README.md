@@ -43,13 +43,41 @@ if __name__ == '__main__':
 
 ```shell
 RUST_LOG=info cargo run --example train -- -p c1=0.1 -p c2=0.1 -p max_iterations=100 -p feature.possible_transitions=1 -m ner train.data -v -v
+RUST_LOG=info cargo run --example tag -- -t -m ner test.data
 ```
 
 ### Benchmark
 
 ```shell
 cargo bench --bench predict_benchmark
+python3 -m locust --host http://localhost:8080 -f locustfile.py
 ```
+
+## Internal
+
+- interface refine
+    - fit (train)
+    - evaluate
+
+```
+model.fit(train_images, 
+        train_labels,
+        epochs=50, 
+        batch_size=batch_size, 
+        callbacks=[cp_callback],
+        validation_data=(test_images, test_labels),
+        verbose=0)
+loss, acc = model.evaluate(test_images, test_labels, verbose=2)
+model.save('my_model.keras')
+model = load_model('my_model.keras')
+new_model.summary()
+new_model.predict(test_images)
+```
+- ref https://www.tensorflow.org/tutorials/keras/text_classification
+- dataset refine
+    - train/validation/test
+- structure:
+    - tower::service API
 
 ## License
 
