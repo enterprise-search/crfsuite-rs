@@ -62,15 +62,16 @@ impl Crf1de {
         log::info!("set data (L: {L}, A: {A}, N: {N}, T: {T})");
         self.ctx = Crf1dContext::new(&[Opt::CTXF_VITERBI, Opt::CTXF_MARGINALS], L, T);
         log::info!("TODO: opts info");
+        log::info!("feature generation (type: crf1d, min_freq: {}, possible_states: {}, possible_transitions: {}", self.opt.feature_minfreq, self.opt.feature_possible_states, self.opt.feature_possible_transitions);
         let begin = Instant::now();
+        self.opt.feature_possible_transitions = true;
         self.features = crf1df_generate(
             ds,
             self.opt.feature_possible_states,
             self.opt.feature_possible_transitions,
             self.opt.feature_minfreq,
         );
-        log::info!("number of features: {}", self.features.len());
-        log::info!("took: {:?}", begin.elapsed());
+        log::info!("number of features: {}, time cost: {:?}", self.features.len(), begin.elapsed());
         self.attrs.resize(A, FeatRefs::default());
         self.forward_trans.resize(L, FeatRefs::default());
         crf1df_init_references(&mut self.attrs, &mut self.forward_trans, &self.features);
@@ -119,21 +120,19 @@ impl Crf1de {
             let item = &seq.items[t];
 
             /* Compute expectations for state features at position #t. */
-            for c in 0..item.len() {
                 /* Access the attribute. */
-                for attr in item {
-                    let attr_feat_refs = &self.attrs[attr.id as usize];
+            for attr in item {
+                let attr_feat_refs = &self.attrs[attr.id as usize];
 
-                    /* Loop over state features for the attribute. */
-                    for fid in attr_feat_refs {
-                        let f = &self.features[*fid];
-                        unsafe {
-                            *w.offset(*fid as isize) += (self.ctx.mexp_state)
-                                [(self.ctx.num_labels) * (t) + (f.dst as usize)]
-                                * attr.value
-                                * weight
-                        };
-                    }
+                /* Loop over state features for the attribute. */
+                for fid in attr_feat_refs {
+                    let f = &self.features[*fid];
+                    unsafe {
+                        *w.offset(*fid as isize) += (self.ctx.mexp_state)
+                            [(self.ctx.num_labels) * (t) + (f.dst as usize)]
+                            * attr.value
+                            * weight
+                    };
                 }
             }
         }
@@ -178,8 +177,8 @@ impl FeatSet {
 }
 
 fn crf1df_init_references(
-    attrs: &mut Vec<Vec<usize>>,
-    forward_trans: &mut Vec<Vec<usize>>,
+    attrs: &mut Vec<FeatRefs>,
+    forward_trans: &mut Vec<FeatRefs>,
     features: &Vec<Feat>,
 ) {
     let K = features.len();
@@ -217,7 +216,7 @@ fn crf1df_generate(
 ) -> Vec<Feat> {
     let N = ds.len();
     let L = ds.num_labels();
-    log::info!("start generate: N: {N}, L: {L}");
+    log::info!("crf1df_generate: (N: {N}, L: {L})");
     let mut set = FeatSet::default();
     for s in 0..N {
         let mut prev = L;
@@ -362,4 +361,43 @@ impl TagEncoder {
 
 pub trait Crf1dTrainer {
     fn train(&mut self, data: &Dataset, fpath: PathBuf, holdout: usize);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_data() {
+        let mut o = Crf1de::default();
+        assert_eq!(o.num_features(), 0);
+        assert_eq!(o.num_labels(), 0);
+        let s = "P\thello\tworld
+        Q\thi\tthere\n\n";
+        let ds = Dataset::from(s.lines());
+        o.set_data(&ds);
+        assert_eq!(o.num_labels(), 2);
+        assert_eq!(o.num_features(), 8);
+        assert_eq!(o.attrs.len(), 4);
+        assert_eq!(o.forward_trans.len(), 2);
+    }
+
+    #[test]
+    fn objective_and_gradients_batch() {
+        // let xseq = vec![
+        //     vec![Attribute::new("walk", 1.0), Attribute::new("shop", 0.5)],
+        //     vec![Attribute::new("walk", 1.0)],
+        //     vec![Attribute::new("walk", 1.0), Attribute::new("clean", 0.5)],
+        //     vec![Attribute::new("shop", 0.5), Attribute::new("clean", 0.5)],
+        //     vec![Attribute::new("walk", 0.5), Attribute::new("clean", 1.0)],
+        //     vec![Attribute::new("clean", 1.0), Attribute::new("shop", 0.1)],
+        //     vec![Attribute::new("walk", 1.0), Attribute::new("shop", 0.5)],
+        //     vec![],
+        //     vec![Attribute::new("clean", 1.0)],
+        // ];
+        let yseq = [
+            "sunny", "sunny", "sunny", "rainy", "rainy", "rainy", "sunny", "sunny", "rainy",
+        ];
+        let o = TagEncoder::new();
+    }
 }
