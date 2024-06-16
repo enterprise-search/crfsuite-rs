@@ -1,9 +1,4 @@
-use std::{
-    ffi::CStr,
-    fmt::write,
-    mem::MaybeUninit,
-    path::{Display, PathBuf},
-};
+use std::{ffi::CStr, mem::MaybeUninit, path::PathBuf, time::Instant};
 
 use clap::Parser;
 use libc::c_void;
@@ -13,7 +8,7 @@ use liblbfgs_sys::{
 
 use crate::Dataset;
 
-use super::trainer::{Crf1dTrainer, TagEncoder};
+use super::trainer::TagEncoder;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -22,6 +17,7 @@ struct Ctx {
     c2: f64,
     trainset: *const Dataset,
     best_w: Vec<f64>,
+    timestamp: Instant,
 }
 
 impl Ctx {
@@ -31,6 +27,7 @@ impl Ctx {
             trainset,
             best_w: vec![0.0; encoder.num_features()],
             encoder: encoder,
+            timestamp: Instant::now(),
         }
     }
 }
@@ -72,9 +69,9 @@ unsafe extern "C" fn proc_evaluate(
     n: i32,
     step: f64,
 ) -> f64 {
-    log::info!("evaluate step: {step}, inst: {:?}", instance);
+    log::debug!("evaluate step: {step}, inst: {:?}", instance);
     let this = (instance as *mut Ctx).as_mut().expect("null instance");
-    log::info!("ctx c2: {:?}, best_w.len: {}", this.c2, this.best_w.len());
+    log::debug!("ctx c2: {:?}, best_w.len: {}", this.c2, this.best_w.len());
     let gm = &mut this.encoder;
     let trainset = this.trainset.as_ref().expect("null dataset");
 
@@ -120,8 +117,8 @@ unsafe extern "C" fn proc_progress(
         }
     }
 
-    log::info!("iteration: {k} (loss: {fx}, feature norm: {xnorm}, error norm: {gnorm}, line search trials: {ls}, line search step: {step}, num_active_features: {num_active_features})");
-
+    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials: {ls}, line search step: {step}, took: {:?})", this.timestamp.elapsed());
+    this.timestamp = Instant::now();
     /* Continue. */
     0
 }
