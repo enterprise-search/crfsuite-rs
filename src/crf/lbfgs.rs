@@ -86,9 +86,9 @@ unsafe extern "C" fn proc_evaluate(
     if this.c2 > 0.0 {
         let c22 = this.c2 * 2.0;
         for i in 0..n {
-            let iv = *x.offset(i as isize);
-            *g.offset(i as isize) += c22 * iv;
-            norm += iv * iv;
+            let xi = *x.offset(i as isize);
+            *g.offset(i as isize) += c22 * xi;
+            norm += xi * xi;
         }
         f += this.c2 * norm;
     }
@@ -135,7 +135,7 @@ pub fn train(mut encoder: TagEncoder, ds: &Dataset, fpath: PathBuf, holdout: usi
     let trainset = std::ptr::addr_of!(*ds);
     assert!(!trainset.is_null(), "null ds ptr");
     assert!(K > 0, "number of features should be positive");
-    log::info!("K: {K}");
+    log::info!("L: {L}, A: {A}, N: {N}, K: {K}");
     let mut params = MaybeUninit::<lbfgs_parameter_t>::uninit();
     let mut params = unsafe {
         lbfgs_parameter_init(params.as_mut_ptr());
@@ -151,6 +151,7 @@ pub fn train(mut encoder: TagEncoder, ds: &Dataset, fpath: PathBuf, holdout: usi
         params.max_iterations = 100;
         params.orthantwise_c = 0.1;
         params.linesearch = 2;
+        params.max_linesearch = 20;
     }
     let w = unsafe { lbfgs_malloc(K as i32) };
     assert!(!w.is_null(), "lbfgs_malloc failed");

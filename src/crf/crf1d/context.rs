@@ -442,11 +442,27 @@ impl Crf1dContext {
     }
 }
 
-#[inline]
-fn vecdot(v1: &[f64], v2: &[f64], n: usize) -> f64 {
-    let mut s = 0.0;
-    for i in 0..n {
-        s += v1[i] * v2[i];
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn init() {
+        let L = 9;
+        let T = 12;
+        let ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], L, T);
+        assert_eq!(ctx.num_items, 0);
+        assert_eq!(ctx.cap_items, T);
     }
-    s
+
+    #[test]
+    fn reset() {
+        let L = 9;
+        let T = 12;
+        let mut ctx = Crf1dContext::new(&[Opt::CTXF_MARGINALS, Opt::CTXF_VITERBI], L, T);
+        assert_eq!(ctx.num_items, 0);
+        assert_eq!(ctx.cap_items, T);
+        ctx.reset(&[ResetOpt::RF_STATE]);
+        assert_eq!(ctx.log_norm, 0.0);
+    }
 }

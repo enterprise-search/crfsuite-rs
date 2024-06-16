@@ -18,8 +18,13 @@ use crfsuite_sys::*;
 use libc::{c_char, c_int, c_uint};
 use libc::{c_void, fclose, fdopen};
 use thiserror::Error;
-mod evaluation;
-pub use evaluation::Performance;
+pub mod evaluation;
+pub mod quark;
+pub use evaluation::Evaluation;
+use quark::Quark;
+pub mod crf;
+pub mod dataset;
+pub use dataset::{Dataset, Sequence};
 
 /// Errors from crfsuite ffi functions
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -55,7 +60,7 @@ impl From<libc::c_int> for CrfSuiteError {
     }
 }
 
-#[derive(Debug, Error, Clone, PartialEq)]
+#[derive(Debug, Error, PartialEq)]
 pub enum Error {
     #[error("errors from crfsuite ffi functions")]
     CrfSuiteError(#[from] CrfSuiteError),
@@ -207,6 +212,8 @@ impl FromStr for GraphicalModel {
 /// to various graphical models and training algorithms.
 #[derive(Debug)]
 pub struct Trainer {
+    // m_attrs: Quark,
+    // m_labels: Quark,
     data: *mut crfsuite_data_t,
     trainer: *mut crfsuite_trainer_t,
     #[allow(dead_code)]
@@ -258,6 +265,8 @@ impl Trainer {
                 data: data_ptr,
                 trainer: ptr::null_mut(),
                 verbose,
+                // m_attrs: Quark::default(),
+                // m_labels: Quark::default(),
             }
         }
     }
@@ -336,8 +345,10 @@ impl Trainer {
             if (*self.data).attrs.is_null() || (*self.data).labels.is_null() {
                 self.init()?;
             }
+            if xseq.len() != yseq.len() {
+                return Err(Error::InvalidArgument(format!("the numbers of items and labels differ: |x| = {}, |y| = {}", xseq.len(), yseq.len())));
+            }
             let xseq_len = xseq.len();
-            assert_eq!(xseq_len, yseq.len());
             let mut instance = mem::MaybeUninit::<crfsuite_instance_t>::uninit();
             let mut instance = {
                 crfsuite_instance_init_n(instance.as_mut_ptr(), xseq_len as i32);
@@ -359,6 +370,10 @@ impl Trainer {
                         .get
                         .map(|f| f((*self.data).attrs, name_cstr.as_ptr()))
                         .unwrap();
+                    // let aid2 = self.m_attrs.find_or_insert(&item.name) as i32;
+                    // if aid != aid2 {
+                    //     log::error!("not eq for attr: {} aid: {} aid2: {}", item.name, aid, aid2);
+                    // }
                     (*content).aid = aid;
                     (*content).value = item.value;
                 }
@@ -369,6 +384,10 @@ impl Trainer {
                     .get
                     .map(|f| f((*self.data).labels, y_cstr.as_ptr()))
                     .unwrap();
+                // let label2 = self.m_labels.find_or_insert(yseq[t].as_ref()) as i32;
+                // if label != label2 {
+                //     log::error!("not eq for label: {}, orig: {}, new: {}", yseq[t].as_ref(), label, label2);
+                // }
                 crf_labels[t] = label;
             }
             instance.group = group;
