@@ -1,3 +1,4 @@
+
 use super::crf1d::{
     context::{Crf1dContext, CtxOpt},
     model::FeatRefs,
@@ -5,9 +6,15 @@ use super::crf1d::{
 use crate::{crf::crf1d::context::ResetOpt, Dataset, Sequence};
 use std::{collections::HashSet, hash::Hash, path::PathBuf, time::Instant};
 
-#[derive(Debug, Default)]
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum FeatType {
+    FT_STATE = 0,
+    FT_TRANS = 1,
+}
+
+#[derive(Debug)]
 struct Feat {
-    ftype: u32,
+    ftype: FeatType,
     src: u32,
     dst: u32,
     freq: f64,
@@ -118,17 +125,13 @@ impl Crf1de {
         let L = self.num_labels();
 
         for t in 0..T {
-            let item = &seq.items[t];
-
             /* Compute expectations for state features at position #t. */
             /* Access the attribute. */
-            for attr in item {
-                let attr_feat_refs = &self.attrs[attr.id as usize];
-
+            for attr in &seq.items[t] {
                 /* Loop over state features for the attribute. */
-                for &fid in attr_feat_refs {
+                for &fid in &self.attrs[attr.id as usize] {
                     let f = &self.features[fid];
-                    w[fid] += (self.ctx.mexp_state)[(self.ctx.num_labels) * (t) + (f.dst as usize)]
+                    w[fid] += self.ctx.mexp_state[self.ctx.num_labels * (t) + (f.dst as usize)]
                         * attr.value
                         * weight
                 }
@@ -140,8 +143,7 @@ impl Crf1de {
             let edge = &self.forward_trans[i];
             for &fid in edge {
                 let f = &self.features[fid];
-                w[fid] +=
-                    (self.ctx.mexp_trans)[(self.ctx.num_labels) * (i) + (f.dst as usize)] * weight
+                w[fid] += self.ctx.mexp_trans[self.ctx.num_labels * (i) + (f.dst as usize)] * weight
             }
         }
     }
@@ -188,20 +190,12 @@ fn crf1df_init_references(
     */
     for k in 0..K {
         let f = &features[k];
-        match f.ftype {
-            FT_STATE => {
-                attrs[f.src as usize].push(k);
-            }
-            FT_TRANS => {
-                forward_trans[f.src as usize].push(k);
-            }
-            _ => panic!("unexpected feature type"),
+        match &f.ftype {
+            FeatType::FT_STATE => attrs[f.src as usize].push(k),
+            FeatType::FT_TRANS => forward_trans[f.src as usize].push(k),            
         }
     }
 }
-
-const FT_STATE: u32 = 0;
-const FT_TRANS: u32 = 1;
 
 fn crf1df_generate(
     ds: &Dataset,
@@ -230,7 +224,7 @@ fn crf1df_generate(
             Features with previous label #L are transition BOS. */
             if prev != L {
                 set.add(Feat {
-                    ftype: FT_TRANS,
+                    ftype: FeatType::FT_TRANS,
                     src: prev as u32,
                     dst: curr as u32,
                     freq: seq.weight,
@@ -240,7 +234,7 @@ fn crf1df_generate(
             for attr in item {
                 /* State feature: attribute #a -> state #(item->yid). */
                 set.add(Feat {
-                    ftype: FT_STATE,
+                    ftype: FeatType::FT_STATE,
                     src: attr.id as u32,
                     dst: curr as u32,
                     freq: seq.weight * attr.value,
@@ -252,7 +246,7 @@ fn crf1df_generate(
                 if connect_all_attrs {
                     for i in 0..L {
                         set.add(Feat {
-                            ftype: FT_STATE,
+                            ftype: FeatType::FT_STATE,
                             src: attr.id as u32,
                             dst: i as u32,
                             freq: 0.0,
@@ -273,7 +267,7 @@ fn crf1df_generate(
         for i in 0..L {
             for j in 0..L {
                 set.add(Feat {
-                    ftype: FT_TRANS,
+                    ftype: FeatType::FT_TRANS,
                     src: i as u32,
                     dst: j as u32,
                     freq: 0.0,
@@ -375,6 +369,12 @@ mod tests {
         assert_eq!(o.num_features(), 8);
         assert_eq!(o.attrs.len(), 4);
         assert_eq!(o.forward_trans.len(), 2);
+    }
+
+    #[test]
+    fn feat() {
+        assert_eq!(1, std::mem::size_of::<FeatType>());
+        assert_eq!(24, std::mem::size_of::<Feat>());
     }
 
     #[test]
