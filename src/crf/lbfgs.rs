@@ -1,4 +1,4 @@
-use std::{ffi::CStr, mem::MaybeUninit, path::PathBuf, time::Instant};
+use std::{ffi::CStr, mem::MaybeUninit, path::PathBuf, slice, time::Instant};
 
 use clap::Parser;
 use libc::c_void;
@@ -72,25 +72,27 @@ unsafe extern "C" fn proc_evaluate(
     log::debug!("evaluate step: {step}, inst: {:?}", instance);
     let this = (instance as *mut Ctx).as_mut().expect("null instance");
     log::debug!("ctx c2: {:?}, best_w.len: {}", this.c2, this.best_w.len());
-    let gm = &mut this.encoder;
     let trainset = this.trainset.as_ref().expect("null dataset");
 
+    let n = n as usize;
+    let gs = slice::from_raw_parts_mut(g, n);
+    let xs = slice::from_raw_parts(x, n);
+
     /* Compute the objective value and gradients. */
-    let mut f = gm.objective_and_gradients_batch(trainset, x, g);
+    let mut f = this.encoder.objective_and_gradients_batch(trainset, xs, gs);
 
     /* L2 regularization. */
-    let mut norm = 0.0;
+    let mut norm = 0.0;    
     if this.c2 > 0.0 {
         let c22 = this.c2 * 2.0;
         for i in 0..n {
-            let xi = *x.offset(i as isize);
-            *g.offset(i as isize) += c22 * xi;
-            norm += xi * xi;
+            gs[i] += c22 * xs[i];
+            norm += xs[i] * xs[i];
         }
         f += this.c2 * norm;
     }
 
-    return f;
+    f
 }
 
 #[no_mangle]
@@ -108,17 +110,27 @@ unsafe extern "C" fn proc_progress(
 ) -> i32 {
     let this = (instance as *mut Ctx).as_mut().expect("null instance");
 
+    /* Compute the duration required for this iteration. */
+    let elapsed = this.timestamp.elapsed();
+    this.timestamp = Instant::now();
+
+    let n = n as usize;
+    let xs = slice::from_raw_parts(x, n);
     /* Store the feature weight in case L-BFGS terminates with an error. */
     let mut num_active_features = 0;
     for i in 0..n {
-        this.best_w[i as usize] = *x.offset(i as isize);
-        if this.best_w[i as usize] != 0.0 {
+        this.best_w[i as usize] = xs[i];
+        if xs[i] != 0.0 {
             num_active_features += 1;
         }
     }
 
-    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials: {ls}, line search step: {step}, took: {:?})", this.timestamp.elapsed());
-    this.timestamp = Instant::now();
+    /* Report the progress. */
+    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials/step: {ls}/{step}, took: {elapsed:?})");
+
+    /* Send the tagger with the current parameters. */
+    // TODO
+
     /* Continue. */
     0
 }

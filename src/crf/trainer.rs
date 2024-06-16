@@ -71,14 +71,17 @@ impl Crf1de {
             self.opt.feature_possible_transitions,
             self.opt.feature_minfreq,
         );
-        log::info!("number of features: {}, time cost: {:?}", self.features.len(), begin.elapsed());
+        log::info!(
+            "number of features: {}, time cost: {:?}",
+            self.features.len(),
+            begin.elapsed()
+        );
         self.attrs.resize(A, FeatRefs::default());
         self.forward_trans.resize(L, FeatRefs::default());
         crf1df_init_references(&mut self.attrs, &mut self.forward_trans, &self.features);
     }
 
-    fn state_score(&mut self, seq: &crate::Sequence, w: *const f64) {
-        let L = self.num_labels();
+    fn state_score(&mut self, seq: &crate::Sequence, w: &[f64]) {
         let T = seq.len();
 
         /* Loop over the items in the sequence. */
@@ -91,28 +94,26 @@ impl Crf1de {
                 let attr_feat_refs = &self.attrs[attr.id as usize];
 
                 /* Loop over the state features associated with the attribute. */
-                for fid in attr_feat_refs {
+                for &fid in attr_feat_refs {
                     /* State feature associates the attribute #a with the label #(f->dst). */
-                    let f = &self.features[*fid];
+                    let f = &self.features[fid];
                     self.ctx.state[self.ctx.num_labels * (t) + f.dst as usize] +=
-                        unsafe { *w.offset(*fid as isize) } * attr.value;
+                        w[fid] * attr.value;
                 }
             }
         }
     }
 
-    fn transition_score(&mut self, w: *const f64) {
-        let L = self.num_labels();
-        for i in 0..L {
+    fn transition_score(&mut self, w: &[f64]) {
+        for i in 0..self.num_labels() {
             let edge = &self.forward_trans[i];
-            for fid in edge {
-                self.ctx.trans[self.ctx.num_labels * i + self.features[*fid].dst as usize] =
-                    unsafe { *w.offset(*fid as isize) }
+            for &fid in edge {
+                self.ctx.trans[self.ctx.num_labels * i + self.features[fid].dst as usize] = w[fid];
             }
         }
     }
 
-    fn model_expectation(&self, seq: &Sequence, w: *mut f64, weight: f64) {
+    fn model_expectation(&self, seq: &Sequence, w: &mut [f64], weight: f64) {
         let T = seq.len();
         let L = self.num_labels();
 
@@ -120,19 +121,16 @@ impl Crf1de {
             let item = &seq.items[t];
 
             /* Compute expectations for state features at position #t. */
-                /* Access the attribute. */
+            /* Access the attribute. */
             for attr in item {
                 let attr_feat_refs = &self.attrs[attr.id as usize];
 
                 /* Loop over state features for the attribute. */
-                for fid in attr_feat_refs {
-                    let f = &self.features[*fid];
-                    unsafe {
-                        *w.offset(*fid as isize) += (self.ctx.mexp_state)
-                            [(self.ctx.num_labels) * (t) + (f.dst as usize)]
-                            * attr.value
-                            * weight
-                    };
+                for &fid in attr_feat_refs {
+                    let f = &self.features[fid];
+                    w[fid] += (self.ctx.mexp_state)[(self.ctx.num_labels) * (t) + (f.dst as usize)]
+                        * attr.value
+                        * weight
                 }
             }
         }
@@ -140,13 +138,10 @@ impl Crf1de {
         /* Loop over the labels (t, i) */
         for i in 0..L {
             let edge = &self.forward_trans[i];
-            for fid in edge {
-                let f = &self.features[*fid];
-                unsafe {
-                    *w.offset(*fid as isize) += (self.ctx.mexp_trans)
-                        [(self.ctx.num_labels) * (i) + (f.dst as usize)]
-                        * weight
-                };
+            for &fid in edge {
+                let f = &self.features[fid];
+                w[fid] +=
+                    (self.ctx.mexp_trans)[(self.ctx.num_labels) * (i) + (f.dst as usize)] * weight
             }
         }
     }
@@ -305,15 +300,15 @@ impl TagEncoder {
     pub(crate) fn objective_and_gradients_batch(
         &mut self,
         ds: &Dataset,
-        w: *const f64,
-        g: *mut f64,
+        w: &[f64],
+        g: &mut [f64],
     ) -> f64 {
         let N = ds.len();
         let K = self.internal.num_features();
 
         // Initialize the gradients with observation expectations.
         for i in 0..K {
-            unsafe { *g.offset(i as isize) = -self.internal.features[i].freq };
+            g[i] = -self.internal.features[i].freq;
         }
 
         /*
