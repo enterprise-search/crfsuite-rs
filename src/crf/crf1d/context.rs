@@ -187,15 +187,23 @@ impl Crf1dContext {
         let L = self.num_labels;
 
         if opts.contains(ResetOpt::RF_STATE) {
-            self.state.fill(0.0);
+            for i in 0..T*L {
+                self.state[i] = 0.0;
+            }
         }
         if opts.contains(ResetOpt::RF_TRANS) {
-            self.trans.fill(0.0);
+            for i in 0..L*L {
+                self.trans[i] = 0.0;
+            }
         }
 
         if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
-            self.mexp_state.fill(0.0);
-            self.mexp_trans.fill(0.0);
+            for i in 0..T*L {
+                self.mexp_state[i] = 0.0;
+            }
+            for i in 0..L*L {
+                self.mexp_trans[i] = 0.0;
+            }
             self.log_norm = 0.0;
         }
     }
