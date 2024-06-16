@@ -18,12 +18,19 @@ crfsuite-sys = { path = "crfsuite-sys", version = "0.3" }
 env_logger = "0.11.3"
 log = "0.4.21"
 thiserror = "1.0.61"
+cqdb = "0.5.8"
+serde_json = "1.0.117"
+serde = { version = "1.0.203", features = ["derive"] }
+liblbfgs-sys = "0.1.2"
+bson = "2.11.0"
+clap = { version = "4.5.4", features = ["derive"] }
+bitflags = { version = "2.5.0", features = ["serde"] }
 
 [workspace]
 members = [
     ".",
     "crfsuite-sys",
-    "cabi",
+    "cabi", "server",
 ]
 
 [dev-dependencies]
@@ -35,5 +42,18 @@ name = "train_benchmark"
 harness = false
 
 [[bench]]
+name = "train_new_benchmark"
+harness = false
+
+[[bench]]
 name = "predict_benchmark"
+harness = false
+
+
+[[bench]]
+name = "pred_benchmark"
+harness = false
+
+[[bench]]
+name = "quark_benchmark"
 harness = false
