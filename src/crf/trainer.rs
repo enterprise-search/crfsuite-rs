@@ -162,9 +162,9 @@ impl FeatSet {
 }
 
 fn crf1df_init_references(
-    attrs: &mut Vec<FeatRefs>,
-    forward_trans: &mut Vec<FeatRefs>,
-    features: &Vec<Feat>,
+    attrs: &mut [FeatRefs],
+    forward_trans: &mut [FeatRefs],
+    features: &[Feat],
 ) {
     /*
         The purpose of this routine is to collect references (indices) of:
