@@ -364,23 +364,23 @@ impl Crf1dContext {
 
         /* Compute the beta scores at (T-1, *). */
         for i in 0..L {
-            (self.beta_score)[(self.num_labels) * (T - 1) + (i)] = self.scale_factor[T - 1];
+            self.beta_score[(self.num_labels) * (T - 1) + (i)] = self.scale_factor[T - 1];
         }
 
         /* Compute the beta scores at (t, *). */
         for t in (0..T - 1).rev() {
             for i in 0..L {
-                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)]
-                    * (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
+                self.row[i] = self.beta_score[self.num_labels * (t + 1) + i]
+                    * self.exp_state[self.num_labels * (t + 1) + i];
             }
 
             /* Compute the beta score at (t, i). */
             for i in 0..L {
                 let mut s = 0.0;
                 for j in 0..L {
-                    s += (self.exp_trans)[(self.num_labels) * (i) + (j)] * self.row[j];
+                    s += self.exp_trans[self.num_labels * (i) + j] * self.row[j];
                 }
-                (self.beta_score)[(self.num_labels) * (t) + (i)] = s * self.scale_factor[t];
+                self.beta_score[self.num_labels * (t) + i] = s * self.scale_factor[t];
             }
         }
     }
