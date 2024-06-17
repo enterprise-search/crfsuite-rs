@@ -398,7 +398,7 @@ impl Crf1dContext {
             for i in 0..L {
                 self.mexp_state[self.num_labels * (t) + (i)] = self.alpha_score
                     [self.num_labels * (t) + (i)]
-                    * (self.beta_score)[(self.num_labels) * (t) + (i)]
+                    * self.beta_score[(self.num_labels) * (t) + (i)]
                     / self.scale_factor[t];
             }
         }
@@ -415,17 +415,14 @@ impl Crf1dContext {
         for t in 0..T - 1 {
             /* row[j] = state[t+1][j] * bwd'[t+1][j] */
             for i in 0..L {
-                self.row[i] = (self.beta_score)[(self.num_labels) * (t + 1) + (i)];
-            }
-            for i in 0..L {
-                self.row[i] *= (self.exp_state)[(self.num_labels) * (t + 1) + (i)];
+                self.row[i] = self.beta_score[(self.num_labels) * (t + 1) + (i)] * self.exp_state[(self.num_labels) * (t + 1) + (i)];
             }
 
             for i in 0..L {
                 for j in 0..L {
-                    (self.mexp_trans)[(self.num_labels) * (i) + (j)] += (self.alpha_score)
+                    self.mexp_trans[(self.num_labels) * (i) + (j)] += self.alpha_score
                         [(self.num_labels) * (t) + (i)]
-                        * (self.exp_trans)[(self.num_labels) * (i) + (j)]
+                        * self.exp_trans[(self.num_labels) * (i) + (j)]
                         * self.row[j];
                 }
             }
