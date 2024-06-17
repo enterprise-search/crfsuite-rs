@@ -1,7 +1,9 @@
-#![allow(unknown_lints)]
-#![allow(clippy::useless_transmute)]
-#![allow(clippy::transmute_ptr_to_ref)]
-#![allow(clippy::transmute_ptr_to_ptr)]
+#![feature(test)]
+extern crate test;
+// #![allow(unknown_lints)]
+// #![allow(clippy::useless_transmute)]
+// #![allow(clippy::transmute_ptr_to_ref)]
+// #![allow(clippy::transmute_ptr_to_ptr)]
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, SeekFrom};
@@ -25,7 +27,6 @@ use quark::Quark;
 pub mod crf;
 pub mod dataset;
 pub use dataset::{Dataset, Sequence};
-
 /// Errors from crfsuite ffi functions
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum CrfSuiteError {
