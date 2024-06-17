@@ -45,7 +45,7 @@ pub(crate) struct Crf1dContext {
     /**
      * The maximum number of labels.
      */
-    cap_items: usize,
+    // cap_items: usize,
     /**
      * Logarithm of the normalization factor for the instance.
      *  This is equivalent to the total scores of all paths in the lattice.
@@ -134,7 +134,7 @@ pub(crate) struct Crf1dContext {
 }
 
 impl Crf1dContext {
-    pub fn new(flag: CtxOpt, num_labels: usize, num_items: usize) -> Self {
+    pub fn new(flag: CtxOpt, num_labels: usize, capacity: usize) -> Self {
         let exp_trans = if flag.contains(CtxOpt::CTXF_MARGINALS) {
             vec![0.0; num_labels * num_labels]
         } else {
@@ -154,40 +154,36 @@ impl Crf1dContext {
             mexp_trans,
             ..Default::default()
         };
-        this.resize(num_items);
+        this.resize(capacity);
         this.num_items = 0;
         this
     }
 
-    pub fn resize(&mut self, num_items: usize) {
+    pub fn resize(&mut self, capacity: usize) {
         let num_labels = self.num_labels;
-        self.num_items = num_items;
-        if self.cap_items < num_items {
-            self.alpha_score.clear();
-            self.beta_score.clear();
-            self.scale_factor.clear();
-            self.row.clear();
-            self.state.clear();
+        self.num_items = capacity;
+        self.alpha_score.clear();
+        self.beta_score.clear();
+        self.scale_factor.clear();
+        self.row.clear();
+        self.state.clear();
 
-            self.alpha_score.resize(num_items * num_labels, 0.0);
-            self.beta_score.resize(num_items * num_labels, 0.0);
-            self.scale_factor.resize(num_items, 0.0);
-            self.row.resize(num_labels, 0.0);
-            self.state.resize(num_items * num_labels, 0.0);
+        self.alpha_score.resize(capacity * num_labels, 0.0);
+        self.beta_score.resize(capacity * num_labels, 0.0);
+        self.scale_factor.resize(capacity, 0.0);
+        self.row.resize(num_labels, 0.0);
+        self.state.resize(capacity * num_labels, 0.0);
 
-            if self.flag.contains(CtxOpt::CTXF_VITERBI) {
-                self.backward_edge.clear();
-                self.backward_edge.resize(num_items * num_labels, 0);
-            }
+        if self.flag.contains(CtxOpt::CTXF_VITERBI) {
+            self.backward_edge.clear();
+            self.backward_edge.resize(capacity * num_labels, 0);
+        }
 
-            if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
-                self.exp_state.clear();
-                self.mexp_state.clear();
-                self.exp_state.resize(num_items * num_labels, 0.0);
-                self.mexp_state.resize(num_items * num_labels, 0.0);
-            }
-
-            self.cap_items = num_items;
+        if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
+            self.exp_state.clear();
+            self.mexp_state.clear();
+            self.exp_state.resize(capacity * num_labels, 0.0);
+            self.mexp_state.resize(capacity * num_labels, 0.0);
         }
     }
 
@@ -290,10 +286,8 @@ impl Crf1dContext {
 
     #[inline]
     pub(crate) fn exp_state(&mut self) {
-        let T = self.num_items;
-        let L = self.num_labels;
-        for i in 0..L * T {
-            self.exp_state[i] = self.state[i].exp();
+        for (et, t) in std::iter::zip(&mut self.exp_state, &mut self.state) {
+            *et = t.exp();
         }
     }
 
@@ -311,7 +305,7 @@ impl Crf1dContext {
         if sum != 0.0 {
             self.scale_factor[0] = 1.0 / sum;
             for i in 0..L {
-                (self.alpha_score)[(self.num_labels) * (0) + (i)] *= self.scale_factor[0];
+                self.alpha_score[self.num_labels * (0) + (i)] *= self.scale_factor[0];
             }
         } else {
             self.scale_factor[0] = 1.0;
@@ -326,21 +320,21 @@ impl Crf1dContext {
             }
             for i in 0..L {
                 for j in 0..L {
-                    (self.alpha_score)[(self.num_labels) * (t) + (j)] += (self.alpha_score)
+                    self.alpha_score[(self.num_labels) * (t) + (j)] += self.alpha_score
                         [(self.num_labels) * (t - 1) + (i)]
-                        * (self.exp_trans)[(self.num_labels) * (i) + (j)];
+                        * self.exp_trans[(self.num_labels) * (i) + (j)];
                 }
             }
             sum = 0.0;
             for i in 0..L {
                 self.alpha_score[self.num_labels * (t) + (i)] *=
                     self.exp_state[self.num_labels * (t) + (i)];
-                sum += (self.alpha_score)[(self.num_labels) * (t) + (i)];
+                sum += self.alpha_score[(self.num_labels) * (t) + (i)];
             }
             if sum != 0.0 {
                 self.scale_factor[t] = 1.0 / sum;
                 for i in 0..L {
-                    (self.alpha_score)[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
+                    self.alpha_score[(self.num_labels) * (t) + (i)] *= self.scale_factor[t];
                 }
             } else {
                 self.scale_factor[t] = 1.0;
@@ -351,10 +345,7 @@ impl Crf1dContext {
         norm = 1. / (C[0] * C[1] ... * C[T-1])
         log(norm) = - \sum_{t = 0}^{T-1} log(C[t]).
         */
-        sum = 0.0;
-        for i in 0..T {
-            sum += self.scale_factor[i].ln();
-        }
+        sum = self.scale_factor.iter().map(|x| x.ln()).sum();
         self.log_norm = -sum;
     }
 
@@ -415,7 +406,8 @@ impl Crf1dContext {
         for t in 0..T - 1 {
             /* row[j] = state[t+1][j] * bwd'[t+1][j] */
             for i in 0..L {
-                self.row[i] = self.beta_score[(self.num_labels) * (t + 1) + (i)] * self.exp_state[(self.num_labels) * (t + 1) + (i)];
+                self.row[i] = self.beta_score[(self.num_labels) * (t + 1) + (i)]
+                    * self.exp_state[(self.num_labels) * (t + 1) + (i)];
             }
 
             for i in 0..L {
@@ -431,12 +423,11 @@ impl Crf1dContext {
 
     pub(crate) fn score(&self, labels: &Vec<usize>) -> f64 {
         assert!(!labels.is_empty(), "empty labels");
-        let L = self.num_labels;
         let T = self.num_items;
 
         /* Stay at (0, labels[0]). */
         let mut i = labels[0];
-        let mut r = (self.state)[(self.num_labels) * (0) + (i)];
+        let mut r = self.state[(self.num_labels) * (0) + (i)];
 
         /* Loop over the rest of items. */
         for t in 1..T {
@@ -464,7 +455,7 @@ mod tests {
         let T = 12;
         let ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, L, T);
         assert_eq!(ctx.num_items, 0);
-        assert_eq!(ctx.cap_items, T);
+        // assert_eq!(ctx.cap_items, T);
     }
 
     #[test]
@@ -473,7 +464,7 @@ mod tests {
         let T = 12;
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, L, T);
         assert_eq!(ctx.num_items, 0);
-        assert_eq!(ctx.cap_items, T);
+        // assert_eq!(ctx.cap_items, T);
         ctx.reset(ResetOpt::RF_STATE);
         assert_eq!(ctx.log_norm, 0.0);
     }
