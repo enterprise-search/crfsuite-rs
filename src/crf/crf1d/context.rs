@@ -169,7 +169,6 @@ impl Crf1dContext {
             self.row.clear();
             self.state.clear();
 
-
             self.alpha_score.resize(num_items * num_labels, 0.0);
             self.beta_score.resize(num_items * num_labels, 0.0);
             self.scale_factor.resize(num_items, 0.0);
@@ -323,7 +322,7 @@ impl Crf1dContext {
         */
         for t in 1..T {
             for i in 0..L {
-                ((self.alpha_score)[(self.num_labels) * (t) + (i)]) = 0.0;
+                self.alpha_score[(self.num_labels) * (t) + (i)] = 0.0;
             }
             for i in 0..L {
                 for j in 0..L {
@@ -334,8 +333,8 @@ impl Crf1dContext {
             }
             sum = 0.0;
             for i in 0..L {
-                (self.alpha_score)[(self.num_labels) * (t) + (i)] *=
-                    (self.exp_state)[(self.num_labels) * (t) + (i)];
+                self.alpha_score[self.num_labels * (t) + (i)] *=
+                    self.exp_state[self.num_labels * (t) + (i)];
                 sum += (self.alpha_score)[(self.num_labels) * (t) + (i)];
             }
             if sum != 0.0 {

@@ -116,7 +116,7 @@ unsafe extern "C" fn proc_progress(
     }
 
     /* Report the progress. */
-    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials/step: {ls}/{step:4}, took: {elapsed:?})");
+    log::info!("========> iteration: {k} (loss: {fx:.4}, feature norm: {xnorm:.4}, error norm: {gnorm:.4}, num_active_features: {num_active_features}, line search trials/step: {ls}/{step}, took: {elapsed:?})");
 
     /* Send the tagger with the current parameters. */
     // TODO
