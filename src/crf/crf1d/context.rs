@@ -164,24 +164,26 @@ impl Crf1dContext {
         self.num_items = num_items;
         if self.cap_items < num_items {
             self.alpha_score.clear();
-            self.alpha_score.resize(num_items * num_labels, 0.0);
             self.beta_score.clear();
-            self.beta_score.resize(num_items * num_labels, 0.0);
             self.scale_factor.clear();
-            self.scale_factor.resize(num_items, 0.0);
             self.row.clear();
+            self.state.clear();
+
+
+            self.alpha_score.resize(num_items * num_labels, 0.0);
+            self.beta_score.resize(num_items * num_labels, 0.0);
+            self.scale_factor.resize(num_items, 0.0);
             self.row.resize(num_labels, 0.0);
+            self.state.resize(num_items * num_labels, 0.0);
 
             if self.flag.contains(CtxOpt::CTXF_VITERBI) {
                 self.backward_edge.clear();
                 self.backward_edge.resize(num_items * num_labels, 0);
             }
 
-            self.state.clear();
-            self.state.resize(num_items * num_labels, 0.0);
             if self.flag.contains(CtxOpt::CTXF_MARGINALS) {
                 self.exp_state.clear();
-                self.exp_state.clear();
+                self.mexp_state.clear();
                 self.exp_state.resize(num_items * num_labels, 0.0);
                 self.mexp_state.resize(num_items * num_labels, 0.0);
             }
@@ -216,6 +218,7 @@ impl Crf1dContext {
         }
     }
 
+    #[inline]
     pub fn exp_transition(&mut self) {
         let L = self.num_labels;
         for i in 0..L * L {
@@ -286,8 +289,11 @@ impl Crf1dContext {
         self.log_norm
     }
 
+    #[inline]
     pub(crate) fn exp_state(&mut self) {
-        for i in 0..self.state.len() {
+        let T = self.num_items;
+        let L = self.num_labels;
+        for i in 0..L * T {
             self.exp_state[i] = self.state[i].exp();
         }
     }
@@ -297,12 +303,10 @@ impl Crf1dContext {
         let T = self.num_items;
 
         /* Compute the alpha scores on nodes (0, *). alpha[0][j] = state[0][j] */
+        let mut sum = 0.0;
         for i in 0..L {
             (self.alpha_score)[(self.num_labels) * (0) + (i)] =
                 (self.exp_state)[(self.num_labels) * (0) + (i)];
-        }
-        let mut sum = 0.0;
-        for i in 0..L {
             sum += (self.alpha_score)[(self.num_labels) * (0) + (i)];
         }
         if sum != 0.0 {
@@ -328,12 +332,10 @@ impl Crf1dContext {
                         * (self.exp_trans)[(self.num_labels) * (i) + (j)];
                 }
             }
+            sum = 0.0;
             for i in 0..L {
                 (self.alpha_score)[(self.num_labels) * (t) + (i)] *=
                     (self.exp_state)[(self.num_labels) * (t) + (i)];
-            }
-            sum = 0.0;
-            for i in 0..L {
                 sum += (self.alpha_score)[(self.num_labels) * (t) + (i)];
             }
             if sum != 0.0 {
@@ -455,6 +457,7 @@ impl Crf1dContext {
 
 #[cfg(test)]
 mod tests {
+
     use test::Bencher;
 
     use super::*;
@@ -489,12 +492,28 @@ mod tests {
         });
     }
 
-    #[bench]
-    fn bench_alpha_score(b: &mut Bencher) {
+    #[test]
+    fn alpha_score() {
         let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
         ctx.resize(127);
+        for i in 0..ctx.exp_state.len() {
+            ctx.exp_state[i] = i as f64;
+        }
+        ctx.alpha_score();
+        assert_eq!(ctx.log_norm, 6.142037405587356);
+    }
+
+    #[bench]
+    fn bench_alpha_score(b: &mut Bencher) {
+        // 88,935.16 ns/iter (+/- 1,691.53)
+        let mut ctx = Crf1dContext::new(CtxOpt::CTXF_MARGINALS | CtxOpt::CTXF_VITERBI, 31, 0);
+        ctx.resize(127);
+        for i in 0..ctx.exp_state.len() {
+            ctx.exp_state[i] = i as f64;
+        }
         b.iter(|| {
             ctx.alpha_score();
+            ctx.alpha_score[0] = ctx.log_norm;
         });
     }
 
@@ -523,6 +542,26 @@ mod tests {
         ctx.resize(113);
         b.iter(|| {
             ctx.reset(ResetOpt::RF_STATE);
+        });
+    }
+
+    #[test]
+    fn exp_math() {
+        let e = 2.71828182845904523536028747135266250_f64;
+        println!("{}", (e).exp());
+    }
+
+    #[bench]
+    fn bench_exp(b: &mut Bencher) {
+        b.iter(|| {
+            for i in 0..100 {
+                let one = 1.0_f64;
+                // e^1
+                let e = one.exp();
+                // ln(e) - 1 == 0
+                let abs_difference = (e.ln() - 1.0).abs();
+                assert!(abs_difference < 1e-10);
+            }
         });
     }
 

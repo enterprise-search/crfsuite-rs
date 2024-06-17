@@ -1,7 +1,7 @@
 use std::{convert::TryFrom, fs::File, time::{Duration, Instant}};
 
 use crfsuite::{
-    crf::{lbfgs, trainer::TagEncoder},
+    crf::{lbfgs, trainer::Crf1dEncoder},
     Dataset,
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -10,7 +10,7 @@ fn train(ds: &Dataset) {
     let begin = Instant::now();
     let fpath = "ner_new.json";
     let holdout = usize::MAX;
-    let encoder = TagEncoder::new();
+    let encoder = Crf1dEncoder::default();
     lbfgs::train(encoder, &ds, fpath.into(), holdout);
     println!("took: {:?}", begin.elapsed());
 }

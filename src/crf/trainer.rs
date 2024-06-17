@@ -297,11 +297,8 @@ impl Encoder for Crf1dEncoder {
 
     /* LEVEL_NONE -> LEVEL_NONE. */
     fn objective_and_gradients_batch(&mut self, ds: &Dataset, w: &[f64], g: &mut [f64]) -> f64 {
-        let N = ds.len();
-        let K = self.num_features();
-
         // Initialize the gradients with observation expectations.
-        for i in 0..K {
+        for i in 0..self.num_features() {
             g[i] = -self.features[i].freq;
         }
 

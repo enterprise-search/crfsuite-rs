@@ -79,6 +79,11 @@ new_model.predict(test_images)
 - structure:
     - tower::service API
 
+## Performance
+
+- Optimization
+    - https://nnethercote.github.io/perf-book/title-page.html
+
 ## License
 
 This work is released under the MIT license. A copy of the license is provided in the [LICENSE](./LICENSE) file.
