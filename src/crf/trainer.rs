@@ -28,8 +28,8 @@ impl TryFrom<u32> for FeatType {
 #[derive(Debug)]
 struct Feat {
     ftype: FeatType,
-    src: u32,
-    dst: u32,
+    src: usize,
+    dst: usize,
     freq: f64,
 }
 
@@ -206,8 +206,8 @@ fn crf1df_generate(
             if prev != L {
                 set.add(Feat {
                     ftype: FeatType::FT_TRANS,
-                    src: prev as u32,
-                    dst: curr as u32,
+                    src: prev,
+                    dst: curr,
                     freq: seq.weight,
                 })
             }
@@ -217,7 +217,7 @@ fn crf1df_generate(
                 set.add(Feat {
                     ftype: FeatType::FT_STATE,
                     src: attr.id,
-                    dst: curr as u32,
+                    dst: curr,
                     freq: seq.weight * attr.value,
                 });
 
@@ -229,7 +229,7 @@ fn crf1df_generate(
                         set.add(Feat {
                             ftype: FeatType::FT_STATE,
                             src: attr.id,
-                            dst: i as u32,
+                            dst: i,
                             freq: 0.0,
                         });
                     }
@@ -248,8 +248,8 @@ fn crf1df_generate(
             for j in 0..L {
                 set.add(Feat {
                     ftype: FeatType::FT_TRANS,
-                    src: i as u32,
-                    dst: j as u32,
+                    src: i,
+                    dst: j,
                     freq: 0.0,
                 });
             }
