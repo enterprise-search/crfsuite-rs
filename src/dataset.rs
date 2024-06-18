@@ -11,7 +11,6 @@ use crate::quark::{Quark, TextVectorizer};
 
 pub type Item = Vec<Attr>;
 
-#[repr(C)]
 #[derive(Debug)]
 pub struct Attr {
     pub id: u32,

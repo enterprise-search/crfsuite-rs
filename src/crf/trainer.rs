@@ -121,7 +121,7 @@ impl Crf1dEncoder {
                     let f = &self.features[fid];
                     w[fid] += self.ctx.mexp_state[self.ctx.num_labels * (t) + (f.dst as usize)]
                         * attr.value
-                        * weight
+                        * weight;
                 }
             }
         }
@@ -131,7 +131,8 @@ impl Crf1dEncoder {
             let edge = &self.forward_trans[i];
             for &fid in edge {
                 let f = &self.features[fid];
-                w[fid] += self.ctx.mexp_trans[self.ctx.num_labels * (i) + (f.dst as usize)] * weight
+                w[fid] +=
+                    self.ctx.mexp_trans[self.ctx.num_labels * (i) + (f.dst as usize)] * weight;
             }
         }
     }
